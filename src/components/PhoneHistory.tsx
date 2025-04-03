@@ -2,18 +2,20 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Copy, History, Phone, Trash } from 'lucide-react';
+import { Copy, History, Phone, Trash, CreditCard } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { uk } from 'date-fns/locale';
+import { NumberType } from '@/hooks/usePhoneHistory';
 
-interface PhoneHistoryItem {
+interface HistoryItem {
   number: string;
   timestamp: number;
+  type: NumberType;
 }
 
 interface PhoneHistoryProps {
-  history: PhoneHistoryItem[];
+  history: HistoryItem[];
   onClearHistory: () => void;
 }
 
@@ -60,7 +62,14 @@ const PhoneHistory: React.FC<PhoneHistoryProps> = ({ history, onClearHistory }) 
         {displayedHistory.map((item, index) => (
           <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
             <div className="flex flex-col">
-              <span className="font-medium">{item.number}</span>
+              <div className="font-medium flex items-center">
+                {item.type === NumberType.PHONE ? (
+                  <Phone className="h-4 w-4 mr-1 text-brand-blue" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-1 text-brand-blue" />
+                )}
+                {item.number}
+              </div>
               <span className="text-xs text-gray-500">
                 {format(item.timestamp, "d MMMM, HH:mm", { locale: uk })}
               </span>
@@ -74,14 +83,16 @@ const PhoneHistory: React.FC<PhoneHistoryProps> = ({ history, onClearHistory }) 
               >
                 <Copy className="h-4 w-4" />
               </Button>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => callNumber(item.number)}
-                className="flex items-center gap-1 bg-brand-blue hover:bg-brand-dark-blue"
-              >
-                <Phone className="h-4 w-4" />
-              </Button>
+              {item.type === NumberType.PHONE && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => callNumber(item.number)}
+                  className="flex items-center gap-1 bg-brand-blue hover:bg-brand-dark-blue"
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         ))}

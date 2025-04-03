@@ -1,13 +1,19 @@
 
 import { useState, useEffect } from 'react';
 
-interface PhoneHistoryItem {
+export enum NumberType {
+  PHONE = 'phone',
+  CARD = 'card'
+}
+
+interface HistoryItem {
   number: string;
   timestamp: number;
+  type: NumberType;
 }
 
 export const usePhoneHistory = () => {
-  const [history, setHistory] = useState<PhoneHistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -26,23 +32,23 @@ export const usePhoneHistory = () => {
     localStorage.setItem('phoneHistory', JSON.stringify(history));
   }, [history]);
 
-  // Add a new phone number to history
-  const addToHistory = (number: string) => {
+  // Add a new number to history
+  const addToHistory = (number: string, type: NumberType) => {
     setHistory(prev => {
       // Check if number already exists in history
-      const exists = prev.some(item => item.number === number);
+      const exists = prev.some(item => item.number === number && item.type === type);
       if (exists) {
         // Move it to the top if it exists
         return [
-          { number, timestamp: Date.now() },
-          ...prev.filter(item => item.number !== number)
+          { number, timestamp: Date.now(), type },
+          ...prev.filter(item => !(item.number === number && item.type === type))
         ];
       } else {
         // Add it as new if it doesn't exist
         return [
-          { number, timestamp: Date.now() },
+          { number, timestamp: Date.now(), type },
           ...prev
-        ].slice(0, 20); // Keep only last 20 items
+        ].slice(0, 30); // Keep only last 30 items
       }
     });
   };
