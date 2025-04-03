@@ -1,4 +1,3 @@
-
 import { createWorker } from 'tesseract.js';
 
 // Configure phone number regular expressions for different formats
@@ -161,24 +160,20 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
   cards: string[];
 }> => {
   try {
-    // Initialize worker with enhanced options
-    const worker = await createWorker('ukr+eng', { 
-      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
-      logger: progress => {
-        if (progress.status === 'recognizing text') {
-          console.log(`Recognition progress: ${progress.progress * 100}%`);
-        }
-      },
-      errorHandler: error => {
-        console.error('Tesseract error:', error);
-      }
-    });
+    // Initialize worker properly according to Tesseract.js types
+    const worker = await createWorker('ukr+eng');
     
-    // Set image recognition parameters
+    // Set image recognition parameters using proper types
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789 +-()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
-      tessedit_pageseg_mode: '6', // Assume a single uniform block of text
       preserve_interword_spaces: '1',
+    });
+    
+    // Log progress separately
+    worker.setProgressHandler((progress) => {
+      if (progress.status === 'recognizing text') {
+        console.log(`Recognition progress: ${progress.progress * 100}%`);
+      }
     });
     
     // Recognize text
