@@ -7,6 +7,7 @@ import PhoneNumberDisplay from '@/components/PhoneNumberDisplay';
 import PhoneHistory from '@/components/PhoneHistory';
 import { extractNumbersFromImage } from '@/services/phoneExtractor';
 import { usePhoneHistory, NumberType } from '@/hooks/usePhoneHistory';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -27,10 +28,21 @@ const Index = () => {
     setIsProcessing(true);
     try {
       const { phones, cards } = await extractNumbersFromImage(selectedImage);
+      
+      // Update state with extracted numbers
       setExtractedPhones(phones);
       setExtractedCards(cards);
+      
+      // Show proper feedback to user
+      if (phones.length === 0 && cards.length === 0) {
+        toast.warning('Номери не знайдено. Спробуйте інше зображення або перевірте якість фото.');
+      } else {
+        const totalFound = phones.length + cards.length;
+        toast.success(`Знайдено ${totalFound} номер${totalFound !== 1 ? 'ів' : ''}`);
+      }
     } catch (error) {
       console.error('Error processing image:', error);
+      toast.error('Помилка при обробці зображення. Спробуйте ще раз.');
     } finally {
       setIsProcessing(false);
     }
@@ -38,6 +50,17 @@ const Index = () => {
 
   const handleSelectNumber = (number: string, type: NumberType) => {
     addToHistory(number, type);
+  };
+
+  // Function to manually add a card or phone number
+  const handleManualAdd = (number: string, type: NumberType) => {
+    if (type === NumberType.CARD) {
+      setExtractedCards(prev => [...prev, number]);
+    } else {
+      setExtractedPhones(prev => [...prev, number]);
+    }
+    addToHistory(number, type);
+    toast.success(`${type === NumberType.CARD ? 'Номер картки' : 'Номер телефону'} додано`);
   };
 
   return (

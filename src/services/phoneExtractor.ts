@@ -16,12 +16,18 @@ const phoneRegexPatterns = [
 
 // Configure credit card number regular expressions
 const cardRegexPatterns = [
-  // Visa, Mastercard, etc. with spaces, dashes or no separators
-  /\b(?:\d[ -]*?){13,19}\b/g,
-  // 16 digits with optional spaces or dashes (4 digits groups)
-  /\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g,
+  // Card numbers with spaces (exactly in format: XXXX XXXX XXXX XXXX)
+  /\b\d{4}\s\d{4}\s\d{4}\s\d{4}\b/g,
+  // Card numbers with different separators or no separators
+  /\b(?:\d{4}[-\s]?){3}\d{4}\b/g,
+  // Visa pattern starting with 4
+  /\b4\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
+  // Mastercard pattern starting with 5
+  /\b5\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
   // 16 digits in a row
-  /\b\d{16}\b/g
+  /\b\d{16}\b/g,
+  // More relaxed pattern for card numbers
+  /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g
 ];
 
 // Clean up the extracted number
@@ -36,6 +42,14 @@ const isLikelyCardNumber = (number: string): boolean => {
   
   // Card number length check (most cards are 16 digits, some are 13-19)
   if (cleaned.length < 13 || cleaned.length > 19) return false;
+  
+  // Check if it starts with common card prefixes
+  if (cleaned.startsWith('4') || // Visa
+      cleaned.startsWith('5') || // Mastercard
+      cleaned.startsWith('34') || cleaned.startsWith('37') || // American Express
+      cleaned.startsWith('6')) { // Discover, UnionPay, etc.
+    return true;
+  }
   
   // Basic Luhn algorithm (checksum) for credit card validation
   let sum = 0;
@@ -73,12 +87,29 @@ const isLikelyPhoneNumber = (number: string): boolean => {
   return false;
 };
 
+// Advanced preprocessing of text before extraction
+const preprocessText = (text: string): string => {
+  // Replace common OCR mistakes in card numbers
+  let processed = text;
+  processed = processed.replace(/[oO]/g, '0'); // Replace 'o' or 'O' with '0'
+  processed = processed.replace(/[iIlL]/g, '1'); // Replace 'i', 'I', 'l', 'L' with '1'
+  processed = processed.replace(/[zZ]/g, '2'); // Replace 'z' or 'Z' with '2'
+  processed = processed.replace(/[bB]/g, '8'); // Replace 'b' or 'B' with '8'
+  processed = processed.replace(/[gG]/g, '9'); // Replace 'g' or 'G' with '9'
+  
+  // Add spaces to potential card numbers to help regex matching
+  processed = processed.replace(/(\d{4})(\d{4})(\d{4})(\d{4})/g, '$1 $2 $3 $4');
+  
+  return processed;
+};
+
 // Extract phone numbers from text
 export const extractPhoneNumbers = (text: string): string[] => {
   const numbers = new Set<string>();
+  const processedText = preprocessText(text);
   
   phoneRegexPatterns.forEach(regex => {
-    const matches = text.match(regex);
+    const matches = processedText.match(regex);
     if (matches) {
       matches.forEach(match => {
         const cleanedNumber = cleanNumber(match);
@@ -95,16 +126,29 @@ export const extractPhoneNumbers = (text: string): string[] => {
 // Extract credit card numbers from text
 export const extractCardNumbers = (text: string): string[] => {
   const numbers = new Set<string>();
+  const processedText = preprocessText(text);
   
+  // First look for exact matches using regex
   cardRegexPatterns.forEach(regex => {
-    const matches = text.match(regex);
+    const matches = processedText.match(regex);
     if (matches) {
       matches.forEach(match => {
         const cleanedNumber = cleanNumber(match);
-        if (isLikelyCardNumber(cleanedNumber)) {
+        const digitOnly = cleanedNumber.replace(/\D/g, '');
+        if (digitOnly.length >= 13 && digitOnly.length <= 19) {
           numbers.add(cleanedNumber);
         }
       });
+    }
+  });
+  
+  // Also try to find card numbers by looking at sequences of digits
+  const allDigitSequences = processedText.match(/\d[\d\s-]{14,21}\d/g) || [];
+  allDigitSequences.forEach(seq => {
+    const cleanedSeq = cleanNumber(seq);
+    const digitOnly = cleanedSeq.replace(/\D/g, '');
+    if (digitOnly.length >= 13 && digitOnly.length <= 19) {
+      numbers.add(cleanedSeq);
     }
   });
   
@@ -117,11 +161,29 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
   cards: string[];
 }> => {
   try {
-    // Initialize worker
-    const worker = await createWorker('ukr+eng');
+    // Initialize worker with enhanced options
+    const worker = await createWorker('ukr+eng', { 
+      langPath: 'https://tessdata.projectnaptha.com/4.0.0',
+      logger: progress => {
+        if (progress.status === 'recognizing text') {
+          console.log(`Recognition progress: ${progress.progress * 100}%`);
+        }
+      },
+      errorHandler: error => {
+        console.error('Tesseract error:', error);
+      }
+    });
+    
+    // Set image recognition parameters
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789 +-()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
+      tessedit_pageseg_mode: '6', // Assume a single uniform block of text
+      preserve_interword_spaces: '1',
+    });
     
     // Recognize text
     const { data } = await worker.recognize(imageSrc);
+    console.log("Recognized text:", data.text); // Log for debugging
     
     // Terminate worker
     await worker.terminate();
@@ -129,6 +191,9 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     // Extract numbers from recognized text
     const phones = extractPhoneNumbers(data.text);
     const cards = extractCardNumbers(data.text);
+    
+    console.log("Extracted phones:", phones);
+    console.log("Extracted cards:", cards);
     
     return { phones, cards };
   } catch (error) {
