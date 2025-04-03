@@ -1,3 +1,4 @@
+
 import { createWorker } from 'tesseract.js';
 
 // Configure phone number regular expressions for different formats
@@ -169,15 +170,17 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
       preserve_interword_spaces: '1',
     });
     
-    // Log progress separately
-    worker.setProgressHandler((progress) => {
-      if (progress.status === 'recognizing text') {
-        console.log(`Recognition progress: ${progress.progress * 100}%`);
+    // Log progress using the correct Tesseract.js API
+    // The progress is logged during the recognize call instead
+    
+    // Recognize text with progress logging
+    const { data } = await worker.recognize(imageSrc, {
+      logger: progress => {
+        if (progress.status === 'recognizing text') {
+          console.log(`Recognition progress: ${progress.progress * 100}%`);
+        }
       }
     });
-    
-    // Recognize text
-    const { data } = await worker.recognize(imageSrc);
     console.log("Recognized text:", data.text); // Log for debugging
     
     // Terminate worker
