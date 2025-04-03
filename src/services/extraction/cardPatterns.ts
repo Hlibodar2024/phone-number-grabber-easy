@@ -11,8 +11,13 @@ export const cardRegexPatterns = [
   /\b5\d{3}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g,
   // 16 digits in a row
   /\b\d{16}\b/g,
-  // More relaxed pattern for card numbers
-  /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g
+  // More relaxed pattern for card numbers with any separator
+  /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+  // More permissive pattern for any 16 digits potentially representing a card
+  /\b[\d\s-]{16,19}\b/g,
+  // Find partial card numbers
+  /4\d{3}[\s-]?\d{4}[\s-]?\d{4}/g,  // Partial Visa (last 4 might be missing)
+  /5\d{3}[\s-]?\d{4}[\s-]?\d{4}/g,  // Partial Mastercard (last 4 might be missing)
 ];
 
 // Validate if the number is likely a credit card
@@ -69,13 +74,27 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     }
   });
   
-  // Also try to find card numbers by looking at sequences of digits
-  const allDigitSequences = text.match(/\d[\d\s-]{14,21}\d/g) || [];
-  allDigitSequences.forEach(seq => {
-    const cleanedSeq = cleanNumber(seq);
-    const digitOnly = cleanedSeq.replace(/\D/g, '');
+  // Extract potential card numbers from the text
+  const potentialMatches = text.match(/\d[\d\s-]{14,21}\d/g) || [];
+  potentialMatches.forEach(match => {
+    const cleanedMatch = cleanNumber(match);
+    const digitOnly = cleanedMatch.replace(/\D/g, '');
     if (digitOnly.length >= 13 && digitOnly.length <= 19) {
-      numbers.add(cleanedSeq);
+      // Check for the Luhn algorithm or prefix patterns for higher confidence
+      if (isLikelyCardNumber(cleanedMatch)) {
+        numbers.add(cleanedMatch);
+      }
+    }
+  });
+  
+  // Special pattern for Visa cards for more aggressive matching
+  const visaPattern = /4[0-9\s-]{15,18}/g;
+  const visaMatches = text.match(visaPattern) || [];
+  visaMatches.forEach(match => {
+    const cleanedMatch = cleanNumber(match);
+    const digitOnly = cleanedMatch.replace(/\D/g, '');
+    if (digitOnly.length >= 13 && digitOnly.length <= 19) {
+      numbers.add(cleanedMatch);
     }
   });
   
