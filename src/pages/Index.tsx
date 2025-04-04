@@ -99,13 +99,14 @@ const Index = () => {
           </Button>
         )}
 
-        {((extractedPhones.length > 0 || extractedCards.length > 0) || isProcessing) && (
+        {(selectedImage && isProcessing) || (extractedPhones.length > 0 || extractedCards.length > 0) ? (
           <PhoneNumberDisplay 
             phones={extractedPhones}
             cards={extractedCards}
             onSelectNumber={handleSelectNumber}
+            isProcessing={isProcessing}
           />
-        )}
+        ) : null}
 
         <PhoneHistory 
           history={history} 

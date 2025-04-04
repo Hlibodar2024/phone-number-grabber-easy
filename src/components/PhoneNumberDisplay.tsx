@@ -1,18 +1,24 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Copy, Phone, CreditCard } from 'lucide-react';
+import { Copy, Phone, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { NumberType } from '@/hooks/usePhoneHistory';
+import { Progress } from '@/components/ui/progress';
 
 interface PhoneNumberDisplayProps {
   phones: string[];
   cards: string[];
   onSelectNumber: (number: string, type: NumberType) => void;
+  isProcessing?: boolean;
 }
 
-const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({ phones, cards, onSelectNumber }) => {
+const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({ 
+  phones, 
+  cards, 
+  onSelectNumber,
+  isProcessing = false
+}) => {
   const copyToClipboard = async (number: string, type: NumberType) => {
     try {
       await navigator.clipboard.writeText(number);
@@ -29,6 +35,20 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({ phones, cards, 
     onSelectNumber(number, NumberType.PHONE);
   };
 
+  // Show loading state
+  if (isProcessing) {
+    return (
+      <Card className="p-4 w-full max-w-md mx-auto mt-4">
+        <div className="flex flex-col items-center space-y-4 py-4">
+          <Loader2 className="h-10 w-10 animate-spin text-brand-blue" />
+          <p className="text-center text-gray-700">Розпізнаємо номери...</p>
+          <Progress value={50} className="w-full" />
+        </div>
+      </Card>
+    );
+  }
+
+  // Display empty state only when not processing and no numbers
   if (phones.length === 0 && cards.length === 0) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -37,6 +57,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({ phones, cards, 
     );
   }
 
+  // Display found numbers
   return (
     <Card className="p-4 w-full max-w-md mx-auto mt-4">
       {phones.length > 0 && (
