@@ -107,7 +107,10 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     if (cards.length === 0 && (processedText.includes('VISA') || data.text.includes('VISA') ||
         processedText.includes('visa') || data.text.includes('visa'))) {
       // Look for groups of 4 digits that could be part of a card number
-      const digitGroups = (processedText.match(/\d{4}/g) || []).concat(data.text.match(/\d{4}/g) || []);
+      const processedDigitGroups = processedText.match(/\d{4}/g) || [];
+      const dataDigitGroups = data.text.match(/\d{4}/g) || [];
+      const digitGroups = [...processedDigitGroups, ...dataDigitGroups];
+      
       if (digitGroups.length >= 1) {
         // If we find the first four digits of our specific card
         if (digitGroups.includes('4149')) {
