@@ -1,0 +1,58 @@
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Якщо запит не на існуючий файл або директорію,
+  # перенаправляємо на index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [QSA,L]
+</IfModule>
+
+# Налаштування заголовків для кешування
+<IfModule mod_expires.c>
+  ExpiresActive On
+  
+  # Кешування для статичних ресурсів
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/x-icon "access plus 1 year"
+  
+  # Кешування для JS та CSS
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType application/x-javascript "access plus 1 month"
+  
+  # Кешування для шрифтів
+  ExpiresByType application/font-woff "access plus 1 year"
+  ExpiresByType application/font-woff2 "access plus 1 year"
+  ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+  ExpiresByType font/ttf "access plus 1 year"
+  ExpiresByType font/otf "access plus 1 year"
+  
+  # Кешування для JSON, XML
+  ExpiresByType application/json "access plus 0 seconds"
+  ExpiresByType application/manifest+json "access plus 0 seconds"
+</IfModule>
+
+# Встановлення правильного типу MIME для різних файлів
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType text/css .css
+  AddType application/manifest+json .webmanifest .manifest
+  AddType application/x-web-app-manifest+json .webapp
+  AddType image/x-icon .ico
+  AddType image/svg+xml .svg
+</IfModule>
+
+# Правила для мережевих файлів PWA
+<FilesMatch "manifest\.json|service-worker\.js">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache"
+    Header set Pragma "no-cache"
+  </IfModule>
+</FilesMatch>
+
