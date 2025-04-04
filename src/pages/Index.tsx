@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Loader2, CreditCard, Phone, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -19,6 +19,22 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { history, addToHistory, clearHistory } = usePhoneHistory();
   const isMobile = useIsMobile();
+  
+  // Secret admin access sequence tracking
+  const [adminClickCount, setAdminClickCount] = useState(0);
+  const logoClickLimit = 5; // Number of clicks required to show admin button
+
+  const handleLogoClick = useCallback(() => {
+    setAdminClickCount(prevCount => {
+      const newCount = prevCount + 1;
+      if (newCount === logoClickLimit) {
+        toast.info('Доступ до адмін-панелі розблоковано', {
+          duration: 2000,
+        });
+      }
+      return newCount;
+    });
+  }, []);
 
   const handleImageUpload = (imageSrc: string) => {
     setSelectedImage(imageSrc);
@@ -74,19 +90,26 @@ const Index = () => {
       
       <div className="p-4 md:p-6">
         <header className="text-center mb-6 relative">
-          <div className="absolute right-0 top-0">
-            <Link to="/admin">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-gray-500 hover:text-brand-blue"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Адміністративна панель</span>
-              </Button>
-            </Link>
-          </div>
-          <h1 className="text-2xl font-bold text-brand-blue">Витягти номер телефону або картки</h1>
+          {adminClickCount >= logoClickLimit && (
+            <div className="absolute right-0 top-0">
+              <Link to="/admin">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-500 hover:text-brand-blue"
+                >
+                  <Settings className="h-5 w-5" />
+                  <span className="sr-only">Адміністративна панель</span>
+                </Button>
+              </Link>
+            </div>
+          )}
+          <h1 
+            className="text-2xl font-bold text-brand-blue cursor-pointer"
+            onClick={handleLogoClick}
+          >
+            Витягти номер телефону або картки
+          </h1>
           <p className="text-gray-600 mt-1">
             Завантажте фото або скріншот із номером телефону або банківської картки
           </p>

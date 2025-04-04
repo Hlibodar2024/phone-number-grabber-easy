@@ -1,15 +1,16 @@
 
 import React, { useState } from 'react';
-import { Loader2, Save, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, ArrowLeft, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const Admin = () => {
+  const navigate = useNavigate();
   const [googleAdsClientId, setGoogleAdsClientId] = useState<string>(() => 
     localStorage.getItem('googleAdsClientId') || ''
   );
@@ -38,18 +39,36 @@ const Admin = () => {
       toast.success('Налаштування збережено успішно');
     }, 800);
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminAuthenticated');
+    toast.success('Ви вийшли з системи');
+    navigate('/');
+  };
   
   return (
     <div className="min-h-screen p-4 md:p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Link to="/" className="mr-3">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              На головну
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold text-brand-blue">Адміністративна панель</h1>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Link to="/" className="mr-3">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                На головну
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-brand-blue">Адміністративна панель</h1>
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleLogout}
+            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Вийти
+          </Button>
         </div>
         
         <Card className="p-6 mb-6">
