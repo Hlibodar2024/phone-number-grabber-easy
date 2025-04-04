@@ -17,7 +17,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789 +-()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
       preserve_interword_spaces: '1',
-      tessedit_pageseg_mode: '6', // Assume a single uniform block of text
+      tessedit_pageseg_mode: 6, // Assume a single uniform block of text (using number instead of string)
       tessedit_ocr_engine_mode: '2', // Use neural network LSTM engine
       tessjs_create_hocr: '0', // We don't need HOCR output
       tessjs_create_tsv: '0',  // We don't need TSV output
