@@ -1,12 +1,15 @@
 
 import React, { useState } from 'react';
-import { Loader2, CreditCard, Phone } from 'lucide-react';
+import { Loader2, CreditCard, Phone, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import ImageUploader from '@/components/ImageUploader';
 import PhoneNumberDisplay from '@/components/PhoneNumberDisplay';
 import PhoneHistory from '@/components/PhoneHistory';
+import GoogleAd from '@/components/GoogleAd';
 import { extractNumbersFromImage } from '@/services/phoneExtractor';
 import { usePhoneHistory, NumberType } from '@/hooks/usePhoneHistory';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
 
 const Index = () => {
@@ -15,6 +18,7 @@ const Index = () => {
   const [extractedCards, setExtractedCards] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { history, addToHistory, clearHistory } = usePhoneHistory();
+  const isMobile = useIsMobile();
 
   const handleImageUpload = (imageSrc: string) => {
     setSelectedImage(imageSrc);
@@ -64,54 +68,81 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-6 bg-gray-50">
-      <header className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-brand-blue">Витягти номер телефону або картки</h1>
-        <p className="text-gray-600 mt-1">
-          Завантажте фото або скріншот із номером телефону або банківської картки
-        </p>
-      </header>
+    <div className="min-h-screen bg-gray-50">
+      {/* Top ad banner */}
+      <GoogleAd format="horizontal" />
+      
+      <div className="p-4 md:p-6">
+        <header className="text-center mb-6 relative">
+          <div className="absolute right-0 top-0">
+            <Link to="/admin">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-gray-500 hover:text-brand-blue"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="sr-only">Адміністративна панель</span>
+              </Button>
+            </Link>
+          </div>
+          <h1 className="text-2xl font-bold text-brand-blue">Витягти номер телефону або картки</h1>
+          <p className="text-gray-600 mt-1">
+            Завантажте фото або скріншот із номером телефону або банківської картки
+          </p>
+        </header>
 
-      <div className="max-w-md mx-auto space-y-4">
-        <ImageUploader 
-          onImageUploaded={handleImageUpload} 
-          isProcessing={isProcessing}
-        />
-        
-        {selectedImage && (
-          <Button 
-            className="w-full bg-brand-blue hover:bg-brand-dark-blue"
-            onClick={processImage}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Обробка...
-              </>
-            ) : (
-              <div className="flex items-center">
-                <Phone className="mr-1 h-4 w-4" />
-                <CreditCard className="mr-2 h-4 w-4" />
-                Розпізнати номери
-              </div>
-            )}
-          </Button>
-        )}
-
-        {(selectedImage && isProcessing) || (extractedPhones.length > 0 || extractedCards.length > 0) ? (
-          <PhoneNumberDisplay 
-            phones={extractedPhones}
-            cards={extractedCards}
-            onSelectNumber={handleSelectNumber}
+        <div className="max-w-md mx-auto space-y-4">
+          <ImageUploader 
+            onImageUploaded={handleImageUpload} 
             isProcessing={isProcessing}
           />
-        ) : null}
+          
+          {selectedImage && (
+            <Button 
+              className="w-full bg-brand-blue hover:bg-brand-dark-blue"
+              onClick={processImage}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Обробка...
+                </>
+              ) : (
+                <div className="flex items-center">
+                  <Phone className="mr-1 h-4 w-4" />
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Розпізнати номери
+                </div>
+              )}
+            </Button>
+          )}
 
-        <PhoneHistory 
-          history={history} 
-          onClearHistory={clearHistory}
-        />
+          {(selectedImage && isProcessing) || (extractedPhones.length > 0 || extractedCards.length > 0) ? (
+            <PhoneNumberDisplay 
+              phones={extractedPhones}
+              cards={extractedCards}
+              onSelectNumber={handleSelectNumber}
+              isProcessing={isProcessing}
+            />
+          ) : null}
+
+          {/* Side ad for desktop, bottom ad for mobile */}
+          <div className={isMobile ? "my-4" : "hidden md:block md:absolute md:right-6 md:top-32 md:w-[300px]"}>
+            <GoogleAd format={isMobile ? "rectangle" : "vertical"} />
+          </div>
+          
+          <PhoneHistory 
+            history={history} 
+            onClearHistory={clearHistory}
+          />
+        </div>
+      </div>
+      
+      {/* Bottom ad banner */}
+      <div className="mt-8">
+        <GoogleAd format="horizontal" />
       </div>
     </div>
   );
