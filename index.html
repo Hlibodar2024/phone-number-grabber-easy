@@ -7,9 +7,9 @@
     <title>Витягти номер телефону</title>
     <meta name="description" content="Додаток для розпізнавання номерів телефону з зображень та скріншотів" />
     <meta name="author" content="Lovable" />
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/decoder/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
-    <link rel="apple-touch-icon" href="/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="/decoder/icon-192x192.png" />
 
     <meta property="og:title" content="Витягти номер телефону" />
     <meta property="og:description" content="Додаток для розпізнавання номерів телефону з зображень та скріншотів" />
@@ -25,11 +25,11 @@
     <div id="root"></div>
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/decoder/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/service-worker.js')
+          navigator.serviceWorker.register('/decoder/service-worker.js')
             .then(registration => {
               console.log('ServiceWorker registration successful');
             })

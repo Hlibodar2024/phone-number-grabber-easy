@@ -1,11 +1,12 @@
 
 const CACHE_NAME = 'phone-number-grabber-v1';
+const BASE_PATH = '/decoder';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/index.html`,
+  `${BASE_PATH}/manifest.json`,
+  `${BASE_PATH}/icon-192x192.png`,
+  `${BASE_PATH}/icon-512x512.png`
 ];
 
 self.addEventListener('install', (event) => {

@@ -3,23 +3,23 @@
   "name": "Витягти номер телефону",
   "short_name": "Номер Телефону",
   "description": "Додаток для розпізнавання номерів телефону з зображень та скріншотів",
-  "start_url": "/",
+  "start_url": "/decoder/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/decoder/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/decoder/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     },
     {
-      "src": "/maskable_icon.png",
+      "src": "/decoder/maskable_icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
