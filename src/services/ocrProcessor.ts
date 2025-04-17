@@ -43,88 +43,128 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     const potentialNumbers = extractPotentialNumbers(processedText);
     console.log("Potential numbers:", potentialNumbers);
     
-    // Look for Ukrainian phone number patterns specifically
-    let phones: string[] = [];
-    let cards: string[] = [];
-    
-    // Check for Ukrainian phone number patterns like +380 xx xxx xxxx
-    const ukrainianPhonePatterns = [
+    // PRIORITY CHECK: look for Ukrainian phone number patterns
+    const ukrainianPatterns = [
       /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+      /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+      /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
       /\+380\d{9}/g
     ];
     
-    ukrainianPhonePatterns.forEach(pattern => {
+    let phones: string[] = [];
+    
+    // First pass: Look specifically for Ukrainian numbers
+    for (const pattern of ukrainianPatterns) {
       const matches = processedText.match(pattern) || data.text.match(pattern);
-      if (matches) {
+      if (matches && matches.length > 0) {
         matches.forEach(match => {
           const cleaned = cleanNumber(match);
-          // Ensure proper format for Ukrainian numbers
-          if (!cleaned.startsWith('+')) {
-            if (cleaned.startsWith('380')) {
-              phones.push(`+${cleaned}`);
+          // Format Ukrainian numbers consistently
+          let formattedPhone = cleaned;
+          
+          if (cleaned.includes('380')) {
+            // Handle different prefixes
+            if (cleaned.match(/^1\s?8\s?380/)) {
+              // Fix "1 8 380" format (OCR mistake)
+              formattedPhone = `+${cleaned.replace(/^1\s?8\s?/, '')}`;
+            } else if (cleaned.match(/^8\s?380/)) {
+              // Handle "8 380" format
+              formattedPhone = `+${cleaned.replace(/^8\s?/, '')}`;
             } else if (cleaned.startsWith('8380')) {
-              phones.push(`+${cleaned.substring(1)}`);
-            } else {
-              phones.push(`+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`);
+              formattedPhone = `+${cleaned.substring(1)}`;
+            } else if (cleaned.startsWith('380')) {
+              formattedPhone = `+${cleaned}`;
             }
-          } else {
-            phones.push(cleaned);
+          }
+          
+          if (!phones.includes(formattedPhone)) {
+            phones.push(formattedPhone);
           }
         });
       }
-    });
+    }
     
-    // If no Ukrainian phones found, check for generic patterns
+    // Second pass: General number extraction if no Ukrainian numbers found
     if (phones.length === 0) {
       phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
       
-      // Special case for Ukrainian phone numbers that were misrecognized
-      if (phones.length === 0) {
-        // Check if there's anything that remotely looks like a Ukrainian number
-        if (processedText.includes('380') || data.text.includes('380')) {
-          const potentialUkrainianNumber = processedText.match(/[+]?[38]?[03]?80\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g) || 
-                                         data.text.match(/[+]?[38]?[03]?80\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g);
-          
-          if (potentialUkrainianNumber) {
-            potentialUkrainianNumber.forEach(number => {
-              const cleaned = cleanNumber(number);
-              if (cleaned.includes('380')) {
-                if (cleaned.startsWith('8380')) {
-                  phones.push(`+${cleaned.substring(1)}`);
-                } else if (cleaned.startsWith('380')) {
-                  phones.push(`+${cleaned}`);
-                } else {
-                  phones.push(`+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`);
-                }
+      // Additional search for Ukrainian numbers in raw text
+      if (phones.length === 0 && (data.text.includes('380') || data.text.match(/8\s?380/))) {
+        // Look for patterns that might be Ukrainian numbers
+        const potentialUkrPhones = data.text.match(/[+]?[18]?[38]?[03]?80\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g);
+        
+        if (potentialUkrPhones) {
+          potentialUkrPhones.forEach(phone => {
+            const cleaned = cleanNumber(phone);
+            // Format correctly
+            let formattedPhone = cleaned;
+            
+            if (cleaned.includes('380')) {
+              // Handle different prefixes
+              if (cleaned.match(/^1\s?8\s?380/)) {
+                // Fix "1 8 380" format (OCR mistake)
+                formattedPhone = `+${cleaned.replace(/^1\s?8\s?/, '')}`;
+              } else if (cleaned.match(/^8\s?380/)) {
+                // Handle "8 380" format
+                formattedPhone = `+${cleaned.replace(/^8\s?/, '')}`;
+              } else if (cleaned.startsWith('8380')) {
+                formattedPhone = `+${cleaned.substring(1)}`;
+              } else if (cleaned.startsWith('380')) {
+                formattedPhone = `+${cleaned}`;
               }
-            });
-          }
+            }
+            
+            if (!phones.includes(formattedPhone)) {
+              phones.push(formattedPhone);
+            }
+          });
         }
       }
     }
     
-    // Extract card numbers only after ensuring phone numbers are properly identified
-    cards = extractCardNumbers(processedText, cleanNumber);
+    // Extract card numbers only AFTER ensuring all phone numbers are properly identified
+    let cards = extractCardNumbers(processedText, cleanNumber);
     
-    // Post-processing: make sure Ukrainian phone numbers are not classified as cards
+    // Final cleanup: make sure no Ukrainian phone numbers are in cards array
     cards = cards.filter(card => {
       const digitOnly = card.replace(/\D/g, '');
-      return !digitOnly.includes('380') && !digitOnly.startsWith('380');
+      return !digitOnly.includes('380') && 
+             !digitOnly.match(/8380/) &&
+             !digitOnly.match(/8\s?380/);
     });
     
-    // Final check: Ensure 380 numbers are correctly formatted as phones
+    // Make sure all numbers with 380 are in the phones array
     potentialNumbers.forEach(num => {
-      if (num.includes('380') || num.startsWith('380')) {
-        const cleaned = cleanNumber(num);
-        const formattedPhone = cleaned.startsWith('+') ? cleaned : 
-                              cleaned.startsWith('380') ? `+${cleaned}` : 
-                              `+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`;
+      const cleaned = cleanNumber(num);
+      if (cleaned.includes('380') || cleaned.match(/8\s?380/) || cleaned.match(/8380/)) {
+        // Format properly
+        let formattedPhone = cleaned;
+        
+        if (cleaned.match(/^1\s?8\s?380/)) {
+          formattedPhone = `+${cleaned.replace(/^1\s?8\s?/, '')}`;
+        } else if (cleaned.match(/^8\s?380/)) {
+          formattedPhone = `+${cleaned.replace(/^8\s?/, '')}`;
+        } else if (cleaned.startsWith('8380')) {
+          formattedPhone = `+${cleaned.substring(1)}`;
+        } else if (cleaned.startsWith('380')) {
+          formattedPhone = `+${cleaned}`;
+        }
         
         if (!phones.includes(formattedPhone)) {
           phones.push(formattedPhone);
         }
       }
     });
+    
+    // Move any card numbers that look like Ukrainian phone numbers to phones array
+    for (let i = cards.length - 1; i >= 0; i--) {
+      const digitOnly = cards[i].replace(/\D/g, '');
+      if (digitOnly.includes('380')) {
+        const formattedPhone = `+${digitOnly.replace(/^8/, '')}`;
+        phones.push(formattedPhone);
+        cards.splice(i, 1);
+      }
+    }
     
     console.log("Extracted phones:", phones);
     console.log("Extracted cards:", cards);

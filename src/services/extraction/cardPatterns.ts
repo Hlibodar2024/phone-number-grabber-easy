@@ -25,9 +25,12 @@ export const isLikelyCardNumber = (number: string): boolean => {
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
-  // Exclude Ukrainian phone numbers with code 380
-  if (cleaned.includes('380') || cleaned.startsWith('380') || 
-      cleaned.startsWith('8380') || cleaned.startsWith('0380')) {
+  // IMPORTANT: Exclude ANY numbers that have 380 sequence - these are Ukrainian phone numbers
+  if (cleaned.includes('380') || 
+      cleaned.startsWith('380') || 
+      cleaned.match(/8380/) ||
+      cleaned.match(/1\s?8\s?380/) ||
+      cleaned.match(/8\s?380/)) {
     return false;
   }
   
@@ -66,31 +69,32 @@ export const isLikelyCardNumber = (number: string): boolean => {
 export const extractCardNumbers = (text: string, cleanNumber: (number: string) => string): string[] => {
   const numbers = new Set<string>();
   
-  // Skip Ukrainian phone numbers
-  if (text.includes('+380') || text.includes('380')) {
-    const ukrainianPhonePattern = /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g;
-    const ukrainianPhones = text.match(ukrainianPhonePattern) || [];
-    
-    // Remove Ukrainian phone numbers from the text for card extraction
-    let textWithoutPhones = text;
-    ukrainianPhones.forEach(phone => {
-      textWithoutPhones = textWithoutPhones.replace(phone, '');
-    });
-    
-    // Continue with modified text
-    text = textWithoutPhones;
-  }
+  // First exclude anything that looks like a Ukrainian phone number
+  let textForCardExtraction = text;
   
-  // First look for exact matches using regex
+  // Remove Ukrainian phone patterns from the text to avoid false positives
+  const ukrainianPhonePatterns = [
+    /\+?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+  ];
+  
+  ukrainianPhonePatterns.forEach(pattern => {
+    textForCardExtraction = textForCardExtraction.replace(pattern, '');
+  });
+  
+  // Now look for card patterns in the cleaned text
   cardRegexPatterns.forEach(regex => {
-    const matches = text.match(regex);
+    const matches = textForCardExtraction.match(regex);
     if (matches) {
       matches.forEach(match => {
         const cleanedNumber = cleanNumber(match);
         const digitOnly = cleanedNumber.replace(/\D/g, '');
         
-        // Additional check to exclude Ukrainian phone numbers
-        if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
+        // Double-check to exclude Ukrainian phone numbers
+        if (digitOnly.includes('380') || 
+            digitOnly.match(/8380/) || 
+            digitOnly.match(/8\s?380/)) {
           return;
         }
         
@@ -101,14 +105,16 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     }
   });
   
-  // Extract potential card numbers from the text
-  const potentialMatches = text.match(/\d[\d\s-]{14,21}\d/g) || [];
+  // Extract potential card numbers but exclude anything with 380
+  const potentialMatches = textForCardExtraction.match(/\d[\d\s-]{14,21}\d/g) || [];
   potentialMatches.forEach(match => {
     const cleanedMatch = cleanNumber(match);
     const digitOnly = cleanedMatch.replace(/\D/g, '');
     
     // Skip Ukrainian phone numbers
-    if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
+    if (digitOnly.includes('380') || 
+        digitOnly.match(/8380/) || 
+        digitOnly.match(/8\s?380/)) {
       return;
     }
     
@@ -117,23 +123,6 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
       if (isLikelyCardNumber(cleanedMatch)) {
         numbers.add(cleanedMatch);
       }
-    }
-  });
-  
-  // Special pattern for Visa cards for more aggressive matching
-  const visaPattern = /4[0-9\s-]{15,18}/g;
-  const visaMatches = text.match(visaPattern) || [];
-  visaMatches.forEach(match => {
-    const cleanedMatch = cleanNumber(match);
-    const digitOnly = cleanedMatch.replace(/\D/g, '');
-    
-    // Skip if it looks like a Ukrainian phone number
-    if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
-      return;
-    }
-    
-    if (digitOnly.length >= 13 && digitOnly.length <= 19) {
-      numbers.add(cleanedMatch);
     }
   });
   
