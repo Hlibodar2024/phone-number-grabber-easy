@@ -1,13 +1,15 @@
 
 // Configure phone number regular expressions for different formats
 export const phoneRegexPatterns = [
-  // Ukrainian format with proper +380 prefix
+  // Ukrainian format with proper +380 prefix (HIGHEST PRIORITY)
   /\+380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   // Ukrainian formats with different prefixes (8 380, 380, etc.)
   /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   /380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   // Formats that are likely misrecognized Ukrainian numbers
   /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+  // Handle Ukrainian numbers with parentheses
+  /\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   // International formats
   /\+\d{1,3}[-\s]?\(?\d{1,4}\)?[-\s]?\d{1,4}[-\s]?\d{1,9}/g,
   // Basic number format with potential separators
@@ -48,6 +50,7 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
     /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
     /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
     /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    /\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   ];
   
   ukrainianPatterns.forEach(pattern => {
@@ -68,6 +71,10 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
           } else if (cleanedNumber.startsWith('8380')) {
             formattedNumber = `+${cleanedNumber.substring(1)}`;
           } else if (cleanedNumber.startsWith('380')) {
+            formattedNumber = `+${cleanedNumber}`;
+          } else if (cleanedNumber.includes('(8380')) {
+            formattedNumber = `+${cleanedNumber.replace(/\(8/, '(')}`;
+          } else if (cleanedNumber.includes('(380')) {
             formattedNumber = `+${cleanedNumber}`;
           }
         }
@@ -108,6 +115,17 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
       });
     }
   });
+  
+  // Direct pattern matching for the exact format we're seeing in the logs
+  const directPattern = /[8\s]+[+]?380\s+\d{2}\s+\d{3}\s+\d{4}/g;
+  const directMatches = text.match(directPattern);
+  if (directMatches) {
+    directMatches.forEach(match => {
+      const cleanedNumber = cleanNumber(match);
+      const formattedNumber = `+${cleanedNumber.replace(/^8\s?/, '')}`;
+      numbers.add(formattedNumber);
+    });
+  }
   
   // Third pass: General number extraction if no Ukrainian numbers found
   if (numbers.size === 0) {

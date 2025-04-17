@@ -40,30 +40,28 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     const potentialNumbers = extractPotentialNumbers(processedText);
     console.log("Potential numbers:", potentialNumbers);
     
-    // FIRST PASS: Focus on finding any Ukrainian phone number patterns
+    // FIRST PASS: Focus specifically on Ukrainian phone patterns
     let phones: string[] = [];
-    let rawText = data.text + " " + processedText;
+    const rawText = data.text + " " + processedText;
     
-    // Specifically look for "8 380" patterns as these are commonly misidentified
-    const ukrainianPatterns = [
-      /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-      /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    // HIGH PRIORITY: Direct matching for "8 380" and similar Ukrainian patterns
+    const directUkrainianMatches = [
+      ...rawText.matchAll(/[8\s]?[+]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g),
+      ...rawText.matchAll(/\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g)
     ];
     
-    for (const pattern of ukrainianPatterns) {
-      const matches = rawText.match(pattern);
-      if (matches && matches.length > 0) {
-        matches.forEach(match => {
+    if (directUkrainianMatches && directUkrainianMatches.length > 0) {
+      directUkrainianMatches.forEach(matchArray => {
+        const match = matchArray[0];
+        if (match) {
           const cleaned = cleanNumber(match);
-          // Format Ukrainian numbers consistently
           let formattedPhone = cleaned;
           
+          // Format Ukrainian numbers consistently with +380 prefix
           if (cleaned.includes('380')) {
             if (cleaned.match(/^1\s?8\s?380/)) {
-              // Fix "1 8 380" format (OCR mistake)
               formattedPhone = `+${cleaned.replace(/^1\s?8\s?/, '')}`;
             } else if (cleaned.match(/^8\s?380/)) {
-              // Handle "8 380" format
               formattedPhone = `+${cleaned.replace(/^8\s?/, '')}`;
             } else if (cleaned.startsWith('8380')) {
               formattedPhone = `+${cleaned.substring(1)}`;
@@ -75,8 +73,8 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
           if (!phones.includes(formattedPhone)) {
             phones.push(formattedPhone);
           }
-        });
-      }
+        }
+      });
     }
     
     // SECOND PASS: General phone number extraction if first pass didn't find anything
@@ -84,35 +82,48 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
       phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
     }
     
-    // Extract card numbers only AFTER ensuring all phone numbers are properly identified
+    // Extract card numbers AFTER ensuring all phone numbers are properly identified
     let cards = extractCardNumbers(processedText, cleanNumber);
     
-    // Check if any card numbers are actually Ukrainian phone numbers
+    // CRITICAL: Filter out any card numbers that are actually Ukrainian phone numbers
+    cards = cards.filter(card => {
+      const digitOnly = card.replace(/\D/g, '');
+      // If it contains 380, it's a Ukrainian phone number, not a card
+      return !digitOnly.includes('380');
+    });
+    
+    // Move any misidentified Ukrainian phone numbers from cards to phones
     for (let i = cards.length - 1; i >= 0; i--) {
-      const digitOnly = cards[i].replace(/\D/g, '');
-      // If the card number contains 380, it's likely a Ukrainian phone number
-      if (digitOnly.includes('380')) {
+      const card = cards[i];
+      const digitOnly = card.replace(/\D/g, '');
+      
+      // Check for Ukrainian phone number patterns
+      if (digitOnly.includes('380') || 
+          card.includes('380') ||
+          card.match(/^8\s?380/) ||
+          card.match(/^1\s?8\s?380/)) {
+        
         let formattedPhone;
-        if (digitOnly.startsWith('8380')) {
+        if (card.match(/^1\s?8\s?380/)) {
+          formattedPhone = `+${card.replace(/^1\s?8\s?/, '')}`;
+        } else if (card.match(/^8\s?380/)) {
+          formattedPhone = `+${card.replace(/^8\s?/, '')}`;
+        } else if (digitOnly.startsWith('8380')) {
           formattedPhone = `+${digitOnly.substring(1)}`;
         } else if (digitOnly.startsWith('380')) {
           formattedPhone = `+${digitOnly}`;
-        } else if (cards[i].match(/^8\s?380/)) {
-          formattedPhone = `+${cards[i].replace(/^8\s?/, '')}`;
-        } else if (cards[i].match(/^1\s?8\s?380/)) {
-          formattedPhone = `+${cards[i].replace(/^1\s?8\s?/, '')}`;
-        } else {
-          // Handle case where 380 is in the middle
+        } else if (digitOnly.includes('380')) {
+          // Extract the part starting with 380
           const index = digitOnly.indexOf('380');
-          if (index >= 0) {
-            formattedPhone = `+${digitOnly.substring(index)}`;
-          }
+          formattedPhone = `+${digitOnly.substring(index)}`;
         }
         
         if (formattedPhone && !phones.includes(formattedPhone)) {
           phones.push(formattedPhone);
         }
-        cards.splice(i, 1); // Remove from cards array
+        
+        // Remove from cards array
+        cards.splice(i, 1);
       }
     }
     

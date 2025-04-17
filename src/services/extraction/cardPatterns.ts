@@ -25,8 +25,8 @@ export const isLikelyCardNumber = (number: string): boolean => {
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
-  // IMPORTANT: Any numbers that could be Ukrainian phone numbers should NEVER be cards
-  // Checking for any variation of +380, 380, 8380, etc. phone number prefixes
+  // CRITICAL: Any numbers that could be Ukrainian phone numbers should NEVER be cards
+  // This is the most important check - must happen first
   if (cleaned.includes('380') || 
       cleaned.startsWith('380') || 
       cleaned.match(/^8380/) ||
@@ -70,7 +70,7 @@ export const isLikelyCardNumber = (number: string): boolean => {
 export const extractCardNumbers = (text: string, cleanNumber: (number: string) => string): string[] => {
   const numbers = new Set<string>();
   
-  // First exclude anything that looks like a Ukrainian phone number
+  // First completely exclude anything that looks like a Ukrainian phone number
   let textForCardExtraction = text;
   
   // Remove Ukrainian phone patterns from the text to avoid false positives
@@ -78,6 +78,7 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     /\+?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
     /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
     /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    /\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   ];
   
   ukrainianPhonePatterns.forEach(pattern => {
@@ -127,5 +128,9 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     }
   });
   
-  return Array.from(numbers);
+  // Final filter to ensure no Ukrainian phone numbers are in the results
+  return Array.from(numbers).filter(card => {
+    const digitOnly = card.replace(/\D/g, '');
+    return !digitOnly.includes('380');
+  });
 };

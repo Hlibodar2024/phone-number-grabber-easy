@@ -1,14 +1,13 @@
 
-// This ensures proper MIME type handling
+// This service worker enables offline access and faster loading
 self.addEventListener('install', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v1';
+  const CACHE_NAME = 'phone-number-grabber-v2'; // Incrementing cache version
   const BASE_PATH = '/decoder';
   const urlsToCache = [
     `${BASE_PATH}/`,
     `${BASE_PATH}/index.html`,
-    `${BASE_PATH}/manifest.json`,
-    `${BASE_PATH}/icon-192x192.png`,
-    `${BASE_PATH}/icon-512x512.png`
+    `${BASE_PATH}/manifest.json`
+    // Removing icon references to prevent caching errors
   ];
   
   event.waitUntil(
@@ -35,18 +34,28 @@ self.addEventListener('fetch', (event) => {
         if (response) {
           return response;
         }
-        return fetch(event.request).catch(() => {
+        
+        // Clone the request because it's a one-time use stream
+        const fetchRequest = event.request.clone();
+        
+        return fetch(fetchRequest).catch(() => {
           // Return a fallback for network errors
           if (event.request.url.includes('/index.html')) {
             return caches.match('/decoder/');
           }
+          return new Response('Network error occurred', {
+            status: 503,
+            headers: new Headers({
+              'Content-Type': 'text/plain'
+            })
+          });
         });
       })
   );
 });
 
 self.addEventListener('activate', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v1';
+  const CACHE_NAME = 'phone-number-grabber-v2'; // Match the updated cache name
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
