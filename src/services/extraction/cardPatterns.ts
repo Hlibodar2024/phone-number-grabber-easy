@@ -25,6 +25,12 @@ export const isLikelyCardNumber = (number: string): boolean => {
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
+  // Exclude Ukrainian phone numbers with code 380
+  if (cleaned.includes('380') || cleaned.startsWith('380') || 
+      cleaned.startsWith('8380') || cleaned.startsWith('0380')) {
+    return false;
+  }
+  
   // Card number length check (most cards are 16 digits, some are 13-19)
   if (cleaned.length < 13 || cleaned.length > 19) return false;
   
@@ -60,6 +66,21 @@ export const isLikelyCardNumber = (number: string): boolean => {
 export const extractCardNumbers = (text: string, cleanNumber: (number: string) => string): string[] => {
   const numbers = new Set<string>();
   
+  // Skip Ukrainian phone numbers
+  if (text.includes('+380') || text.includes('380')) {
+    const ukrainianPhonePattern = /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g;
+    const ukrainianPhones = text.match(ukrainianPhonePattern) || [];
+    
+    // Remove Ukrainian phone numbers from the text for card extraction
+    let textWithoutPhones = text;
+    ukrainianPhones.forEach(phone => {
+      textWithoutPhones = textWithoutPhones.replace(phone, '');
+    });
+    
+    // Continue with modified text
+    text = textWithoutPhones;
+  }
+  
   // First look for exact matches using regex
   cardRegexPatterns.forEach(regex => {
     const matches = text.match(regex);
@@ -67,6 +88,12 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
       matches.forEach(match => {
         const cleanedNumber = cleanNumber(match);
         const digitOnly = cleanedNumber.replace(/\D/g, '');
+        
+        // Additional check to exclude Ukrainian phone numbers
+        if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
+          return;
+        }
+        
         if (digitOnly.length >= 13 && digitOnly.length <= 19) {
           numbers.add(cleanedNumber);
         }
@@ -79,6 +106,12 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
   potentialMatches.forEach(match => {
     const cleanedMatch = cleanNumber(match);
     const digitOnly = cleanedMatch.replace(/\D/g, '');
+    
+    // Skip Ukrainian phone numbers
+    if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
+      return;
+    }
+    
     if (digitOnly.length >= 13 && digitOnly.length <= 19) {
       // Check for the Luhn algorithm or prefix patterns for higher confidence
       if (isLikelyCardNumber(cleanedMatch)) {
@@ -93,6 +126,12 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
   visaMatches.forEach(match => {
     const cleanedMatch = cleanNumber(match);
     const digitOnly = cleanedMatch.replace(/\D/g, '');
+    
+    // Skip if it looks like a Ukrainian phone number
+    if (digitOnly.includes('380') || digitOnly.startsWith('380')) {
+      return;
+    }
+    
     if (digitOnly.length >= 13 && digitOnly.length <= 19) {
       numbers.add(cleanedMatch);
     }

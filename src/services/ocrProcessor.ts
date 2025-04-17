@@ -43,105 +43,91 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     const potentialNumbers = extractPotentialNumbers(processedText);
     console.log("Potential numbers:", potentialNumbers);
     
-    // Extract numbers from processed text
-    let phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
-    let cards = extractCardNumbers(processedText, cleanNumber);
+    // Look for Ukrainian phone number patterns specifically
+    let phones: string[] = [];
+    let cards: string[] = [];
     
-    // If no cards were found through standard patterns, try card-specific OCR analysis
-    if (cards.length === 0 && potentialNumbers.length > 0) {
-      potentialNumbers.forEach(num => {
-        const digitOnly = num.replace(/\D/g, '');
-        
-        // Check if it could be a card number
-        if (digitOnly.length >= 13 && digitOnly.length <= 19) {
-          // Format with spaces
-          const formattedNum = digitOnly.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-          
-          if (isLikelyCardNumber(formattedNum)) {
-            cards.push(formattedNum);
+    // Check for Ukrainian phone number patterns like +380 xx xxx xxxx
+    const ukrainianPhonePatterns = [
+      /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+      /\+380\d{9}/g
+    ];
+    
+    ukrainianPhonePatterns.forEach(pattern => {
+      const matches = processedText.match(pattern) || data.text.match(pattern);
+      if (matches) {
+        matches.forEach(match => {
+          const cleaned = cleanNumber(match);
+          // Ensure proper format for Ukrainian numbers
+          if (!cleaned.startsWith('+')) {
+            if (cleaned.startsWith('380')) {
+              phones.push(`+${cleaned}`);
+            } else if (cleaned.startsWith('8380')) {
+              phones.push(`+${cleaned.substring(1)}`);
+            } else {
+              phones.push(`+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`);
+            }
+          } else {
+            phones.push(cleaned);
           }
-        }
-      });
-    }
-    
-    // Enhanced direct extraction for the specific card pattern in the image (4149 6090 1222 2800)
-    if (cards.length === 0) {
-      // Look for "4149" in the text as it's the starting sequence of the card in the image
-      if (processedText.includes('4149') || data.text.includes('4149')) {
-        // Try to extract the full card number based on this specific pattern
-        const specificCardRegex = /4149[\s-]?6090[\s-]?1222[\s-]?2800/g;
-        const specificMatch = processedText.match(specificCardRegex) || data.text.match(specificCardRegex);
-        if (specificMatch) {
-          cards.push('4149 6090 1222 2800');
-        }
-      }
-      
-      // Visual pattern recognition for the blue Universal VISA card
-      if (processedText.includes('VISA') || data.text.includes('VISA') || 
-          processedText.includes('UNIVERSAL') || data.text.includes('UNIVERSAL') ||
-          processedText.toUpperCase().includes('UNIVERSAL') || data.text.toUpperCase().includes('UNIVERSAL')) {
-        cards.push('4149 6090 1222 2800');
-      }
-    }
-    
-    // Manual extraction for Visa cards starting with 4
-    if (cards.length === 0) {
-      const visaRegex = /\b4\d{3}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g;
-      const visaMatches = processedText.match(visaRegex) || data.text.match(visaRegex);
-      if (visaMatches) {
-        cards = cards.concat(visaMatches.map(cleanNumber));
-      }
-      
-      // Try to find any 16-digit number
-      const digitSequences = processedText.match(/\b\d{16}\b/g) || data.text.match(/\b\d{16}\b/g);
-      if (digitSequences) {
-        digitSequences.forEach(seq => {
-          // Format with spaces for readability
-          const formattedSeq = seq.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-          cards.push(formattedSeq);
         });
       }
-    }
+    });
     
-    // Hard-coded special case: if we see fragments of a Visa card in the text
-    if (cards.length === 0 && (processedText.includes('VISA') || data.text.includes('VISA') ||
-        processedText.includes('visa') || data.text.includes('visa'))) {
-      // Look for groups of 4 digits that could be part of a card number
-      const processedDigitGroups = processedText.match(/\d{4}/g) || [];
-      const dataDigitGroups = data.text.match(/\d{4}/g) || [];
-      const digitGroups = [...processedDigitGroups, ...dataDigitGroups];
+    // If no Ukrainian phones found, check for generic patterns
+    if (phones.length === 0) {
+      phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
       
-      if (digitGroups.length >= 1) {
-        // If we find the first four digits of our specific card
-        if (digitGroups.includes('4149')) {
-          cards.push('4149 6090 1222 2800');
+      // Special case for Ukrainian phone numbers that were misrecognized
+      if (phones.length === 0) {
+        // Check if there's anything that remotely looks like a Ukrainian number
+        if (processedText.includes('380') || data.text.includes('380')) {
+          const potentialUkrainianNumber = processedText.match(/[+]?[38]?[03]?80\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g) || 
+                                         data.text.match(/[+]?[38]?[03]?80\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g);
+          
+          if (potentialUkrainianNumber) {
+            potentialUkrainianNumber.forEach(number => {
+              const cleaned = cleanNumber(number);
+              if (cleaned.includes('380')) {
+                if (cleaned.startsWith('8380')) {
+                  phones.push(`+${cleaned.substring(1)}`);
+                } else if (cleaned.startsWith('380')) {
+                  phones.push(`+${cleaned}`);
+                } else {
+                  phones.push(`+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`);
+                }
+              }
+            });
+          }
         }
       }
     }
     
-    // Special case: detect the specific card number with expiry date
-    if (cards.length === 0 && (processedText.includes('12/25') || data.text.includes('12/25'))) {
-      cards.push('4149 6090 1222 2800');
-    }
+    // Extract card numbers only after ensuring phone numbers are properly identified
+    cards = extractCardNumbers(processedText, cleanNumber);
+    
+    // Post-processing: make sure Ukrainian phone numbers are not classified as cards
+    cards = cards.filter(card => {
+      const digitOnly = card.replace(/\D/g, '');
+      return !digitOnly.includes('380') && !digitOnly.startsWith('380');
+    });
+    
+    // Final check: Ensure 380 numbers are correctly formatted as phones
+    potentialNumbers.forEach(num => {
+      if (num.includes('380') || num.startsWith('380')) {
+        const cleaned = cleanNumber(num);
+        const formattedPhone = cleaned.startsWith('+') ? cleaned : 
+                              cleaned.startsWith('380') ? `+${cleaned}` : 
+                              `+380${cleaned.replace(/^\D*(\d{2}).*$/, '$1')}`;
+        
+        if (!phones.includes(formattedPhone)) {
+          phones.push(formattedPhone);
+        }
+      }
+    });
     
     console.log("Extracted phones:", phones);
     console.log("Extracted cards:", cards);
-    
-    // If we see the image has "4149 6090 1222 2800" but it wasn't detected, add it manually
-    // This is a specific pattern recognition for the Universal VISA card
-    const hasVisuallySimilarText = 
-      processedText.includes('UMITERSAL') || 
-      processedText.includes('UNIVERSAL') || 
-      processedText.includes('12/25') ||
-      data.text.includes('UMITERSAL') ||
-      data.text.includes('UNIVERSAL') ||
-      data.text.includes('12/25') ||
-      data.text.toLowerCase().includes('visa');
-                                  
-    if (hasVisuallySimilarText && cards.length === 0) {
-      // This is a special case for the Universal VISA card
-      cards.push('4149 6090 1222 2800');
-    }
     
     return { phones, cards };
   } catch (error) {
