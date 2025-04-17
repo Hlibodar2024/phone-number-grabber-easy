@@ -13,9 +13,18 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        return cache.addAll(urlsToCache);
+        // Make sure to only cache resources that exist
+        return fetch(`${BASE_PATH}/manifest.json`)
+          .then(() => cache.addAll(urlsToCache))
+          .catch(() => {
+            console.log('Skipping non-existent resources in cache');
+            // Cache only basic resources if manifest is missing
+            return cache.addAll([`${BASE_PATH}/`, `${BASE_PATH}/index.html`]);
+          });
       })
   );
+  // Skip waiting to make the new service worker active immediately
+  self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -44,4 +53,6 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  // Claim clients to control all open clients without reloading
+  event.waitUntil(clients.claim());
 });

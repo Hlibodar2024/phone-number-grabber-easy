@@ -22,9 +22,10 @@ export const isLikelyPhoneNumber = (number: string): boolean => {
   // Remove all non-digit characters except + for international prefix
   const cleaned = number.replace(/[^\d+]/g, '');
   
-  // Special case for Ukrainian numbers - ANY number with 380 in it
+  // Special case for Ukrainian numbers - ANY number with 380 in it should be treated as phone
   if (cleaned.includes('380') || cleaned.startsWith('+380') || 
-      cleaned.startsWith('8380') || cleaned.match(/^1?\s?8?\s?380/)) {
+      cleaned.match(/^8\s?380/) || cleaned.match(/^8380/) || 
+      cleaned.match(/^1?\s?8?\s?380/)) {
     return true;
   }
   
@@ -42,7 +43,7 @@ export const isLikelyPhoneNumber = (number: string): boolean => {
 export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) => string, isLikelyCardNumber: (number: string) => boolean): string[] => {
   const numbers = new Set<string>();
   
-  // First, try to extract Ukrainian phone numbers with different prefixes
+  // First, try to extract Ukrainian phone numbers with different prefixes - HIGHEST PRIORITY
   const ukrainianPatterns = [
     /(?:\+|)380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
     /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
@@ -58,14 +59,13 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
         
         // Format Ukrainian numbers consistently with +380 prefix
         if (cleanedNumber.includes('380')) {
-          if (cleanedNumber.startsWith('1') && cleanedNumber.includes('8380')) {
+          if (cleanedNumber.match(/^1\s?8\s?380/)) {
             // Handle "1 8 380" format (OCR mistake)
             formattedNumber = `+${cleanedNumber.replace(/^1\s?8\s?/, '')}`;
-          } else if (cleanedNumber.startsWith('8') && !cleanedNumber.startsWith('8380')) {
+          } else if (cleanedNumber.match(/^8\s?380/)) {
             // Handle "8 380" format (without the 8 being part of the code)
-            formattedNumber = `+${cleanedNumber.substring(1)}`;
+            formattedNumber = `+${cleanedNumber.replace(/^8\s?/, '')}`;
           } else if (cleanedNumber.startsWith('8380')) {
-            // Handle "8380" format (with the 8 being an OCR mistake)
             formattedNumber = `+${cleanedNumber.substring(1)}`;
           } else if (cleanedNumber.startsWith('380')) {
             formattedNumber = `+${cleanedNumber}`;
@@ -77,7 +77,39 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
     }
   });
   
-  // Then try other patterns if needed
+  // Second pass: Look specifically for card-like patterns that are actually phones
+  // This is critical for capturing patterns like "8 380 98 126 8747" that might look like cards
+  const cardLikePhonePatterns = [
+    /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+    /\d{1,2}\s?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g
+  ];
+  
+  cardLikePhonePatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const cleanedNumber = cleanNumber(match);
+        let formattedNumber = cleanedNumber;
+        
+        // Format Ukrainian numbers consistently
+        if (cleanedNumber.includes('380')) {
+          if (cleanedNumber.match(/^1\s?8\s?380/)) {
+            formattedNumber = `+${cleanedNumber.replace(/^1\s?8\s?/, '')}`;
+          } else if (cleanedNumber.match(/^8\s?380/)) {
+            formattedNumber = `+${cleanedNumber.replace(/^8\s?/, '')}`;
+          } else if (cleanedNumber.startsWith('8380')) {
+            formattedNumber = `+${cleanedNumber.substring(1)}`;
+          } else if (cleanedNumber.startsWith('380')) {
+            formattedNumber = `+${cleanedNumber}`;
+          }
+        }
+        
+        numbers.add(formattedNumber);
+      });
+    }
+  });
+  
+  // Third pass: General number extraction if no Ukrainian numbers found
   if (numbers.size === 0) {
     phoneRegexPatterns.forEach(regex => {
       const matches = text.match(regex);
@@ -99,7 +131,6 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
               // Handle "8 380" format (without the 8 being part of the code)
               formattedNumber = `+${cleanedNumber.substring(1)}`;
             } else if (cleanedNumber.startsWith('8380')) {
-              // Handle "8380" format (with the 8 being an OCR mistake)
               formattedNumber = `+${cleanedNumber.substring(1)}`;
             } else if (cleanedNumber.startsWith('380')) {
               formattedNumber = `+${cleanedNumber}`;

@@ -20,6 +20,20 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   onSelectNumber,
   isProcessing = false
 }) => {
+  // Ensure no Ukrainian phone numbers appear in cards array
+  const filteredCards = cards.filter(card => {
+    // Check if card contains '380' which indicates it's likely a phone number
+    return !card.includes('380') && !card.includes('+380');
+  });
+
+  // Format phone numbers for consistent display
+  const formattedPhones = phones.map(phone => {
+    if (phone.includes('380') && !phone.startsWith('+')) {
+      return `+${phone.replace(/^8\s?/, '')}`;
+    }
+    return phone;
+  });
+
   const copyToClipboard = async (number: string, type: NumberType) => {
     try {
       await navigator.clipboard.writeText(number);
@@ -50,7 +64,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   }
 
   // Display empty state only when not processing and no numbers
-  if (phones.length === 0 && cards.length === 0) {
+  if (formattedPhones.length === 0 && filteredCards.length === 0) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
         <p className="text-center text-gray-500">Номери не знайдено</p>
@@ -61,13 +75,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   // Display found numbers
   return (
     <Card className="p-4 w-full max-w-md mx-auto mt-4">
-      {phones.length > 0 && (
+      {formattedPhones.length > 0 && (
         <>
           <h3 className="text-lg font-medium mb-3 flex items-center">
             <Phone className="mr-2 h-5 w-5" /> Знайдені номери телефонів:
           </h3>
           <div className="space-y-2 mb-4">
-            {phones.map((number, index) => (
+            {formattedPhones.map((number, index) => (
               <div key={`phone-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                 <span className="font-medium">{number}</span>
                 <div className="flex gap-2">
@@ -96,13 +110,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
         </>
       )}
 
-      {cards.length > 0 && (
+      {filteredCards.length > 0 && (
         <>
           <h3 className="text-lg font-medium mb-3 flex items-center">
             <CreditCard className="mr-2 h-5 w-5" /> Знайдені номери карток:
           </h3>
           <div className="space-y-2">
-            {cards.map((number, index) => (
+            {filteredCards.map((number, index) => (
               <div key={`card-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                 <span className="font-medium">{number}</span>
                 <div className="flex gap-2">

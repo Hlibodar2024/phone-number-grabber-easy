@@ -25,12 +25,13 @@ export const isLikelyCardNumber = (number: string): boolean => {
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
-  // IMPORTANT: Exclude ANY numbers that have 380 sequence - these are Ukrainian phone numbers
+  // IMPORTANT: Any numbers that could be Ukrainian phone numbers should NEVER be cards
+  // Checking for any variation of +380, 380, 8380, etc. phone number prefixes
   if (cleaned.includes('380') || 
       cleaned.startsWith('380') || 
-      cleaned.match(/8380/) ||
-      cleaned.match(/1\s?8\s?380/) ||
-      cleaned.match(/8\s?380/)) {
+      cleaned.match(/^8380/) ||
+      cleaned.match(/^8\s?380/) ||
+      cleaned.match(/^1\s?8\s?380/)) {
     return false;
   }
   
@@ -93,8 +94,8 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
         
         // Double-check to exclude Ukrainian phone numbers
         if (digitOnly.includes('380') || 
-            digitOnly.match(/8380/) || 
-            digitOnly.match(/8\s?380/)) {
+            digitOnly.match(/^8380/) || 
+            digitOnly.match(/^8\s?380/)) {
           return;
         }
         
@@ -113,8 +114,8 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     
     // Skip Ukrainian phone numbers
     if (digitOnly.includes('380') || 
-        digitOnly.match(/8380/) || 
-        digitOnly.match(/8\s?380/)) {
+        digitOnly.match(/^8380/) || 
+        digitOnly.match(/^8\s?380/)) {
       return;
     }
     
