@@ -1,128 +1,154 @@
 
 // Configure phone number regular expressions for different formats
 export const phoneRegexPatterns = [
-  // Ukrainian format with proper +380 prefix (HIGHEST PRIORITY)
+  // Український формат найвищої пріоритетності
   /\+380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // Ukrainian formats with different prefixes (8 380, 380, etc.)
+  
+  // Критичні українські формати "8 380"
   /[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   /380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // Ukrainian formats with extended understanding of "8+380"
   /[8\s]+[+]?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
   /[8\s]+380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // Critical pattern: 8 380 format - this is always a Ukrainian number
+  
+  // Критичний формат: 8 380 - це завжди український номер
   /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
-  // Formats that are likely misrecognized Ukrainian numbers
+  
+  // Формати, які з великою ймовірністю є українськими номерами
   /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // Handle Ukrainian numbers with parentheses
+  
+  // Формати з дужками
   /\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // International formats
+  
+  // Міжнародні формати
   /\+\d{1,3}[-\s]?\(?\d{1,4}\)?[-\s]?\d{1,4}[-\s]?\d{1,9}/g,
-  // Basic number format with potential separators
+  
+  // Базові формати номерів з роздільниками
   /\(?0\d{2}\)?[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   /\(?0\d{2}\)?[-\s]?\d{3}[-\s]?\d{4}/g,
-  // Simple digit sequences that might be phone numbers (9+ digits)
-  /\d{9,}/g
+  
+  // Прості послідовності цифр, які можуть бути номерами телефонів (9+ цифр)
+  /\d{9,}/g,
+  
+  // Додаткові українські шаблони для прямого виявлення
+  /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+  /8\s*\+?380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+  /\(?8\)?\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g
 ];
 
-// Validate if a number matches phone number formats
+// Перевірка, чи відповідає номер форматам номера телефону
 export const isLikelyPhoneNumber = (number: string): boolean => {
-  // Remove all non-digit characters except + for international prefix
+  // КРИТИЧНО: БУДЬ-яка послідовність з 380 повинна вважатися українським номером телефону
+  if (number.includes('380') || number.includes('8 380') || number.match(/8\s*380/)) {
+    console.log("Знайдено український номер за шаблоном 380 або 8 380");
+    return true;
+  }
+  
+  // Видаляємо всі нецифрові символи, окрім + для міжнародного префіксу
   const cleaned = number.replace(/[^\d+]/g, '');
   
-  // CRITICAL: ANY sequence with 380 should be considered a Ukrainian phone number
-  if (cleaned.includes('380') || number.includes('380')) {
-    return true;
-  }
-  
-  // Check for format "8 380" which is also a Ukrainian phone number
-  if (number.match(/8\s*380/)) {
-    return true;
-  }
-  
-  // Phone number typical length check
+  // Перевірка на типову довжину номера телефону
   if (cleaned.length < 10 || cleaned.length > 15) return false;
   
-  // Check for common phone number patterns
+  // Перевірка на поширені шаблони номерів телефонів
   if (cleaned.startsWith('+')) return true;
   if (cleaned.startsWith('0')) return true;
   
   return false;
 };
 
-// Extract phone numbers from text
+// Витягнути номери телефонів з тексту
 export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) => string, isLikelyCardNumber: (number: string) => boolean): string[] => {
   const numbers = new Set<string>();
   
-  // First, directly look for Ukrainian patterns in the raw text
-  // This must happen before any other processing
+  // Спочатку шукаємо українські шаблони в необробленому тексті
   const directUkrainianPatterns = [
     /[8\s]+380\s?\d{2}\s?\d{3}\s?\d{4}/g,
     /[8\s]+[+]?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
     /[8\s]+380\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g,
     /[\(]?8[\)]?\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
-    // Critical pattern: 8 380 format
+    // Критичний шаблон: формат 8 380
     /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
-    // Another critical format
+    // Інший критичний формат
     /1\s?8\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
+    // Додаткові комбінації
+    /8\s*\+?380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+    /\(?8\)?\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+    /8\s*380\s*\d{2}\s*\d{3}\s*\d{2}\s*\d{2}/g
   ];
   
   for (const pattern of directUkrainianPatterns) {
     const matches = text.match(pattern);
     if (matches) {
       matches.forEach(match => {
-        // Format Ukrainian numbers consistently with +380 prefix
+        // Форматуємо українські номери послідовно з префіксом +380
         const digits = match.replace(/[^\d]/g, '');
         if (digits.includes('380')) {
-          // Extract the portion starting with 380
+          // Витягуємо частину, що починається з 380
           const index = digits.indexOf('380');
           let formattedNumber = `+${digits.substring(index)}`;
           numbers.add(formattedNumber);
+          console.log("Додано український номер з шаблону:", formattedNumber);
         }
       });
     }
   }
   
-  // If no Ukrainian numbers found through direct patterns, try the standard patterns
+  // Якщо не знайдено українських номерів через прямі шаблони, спробуйте стандартні шаблони
   if (numbers.size === 0) {
-    phoneRegexPatterns.forEach(regex => {
-      const matches = text.match(regex);
-      if (matches) {
-        matches.forEach(match => {
-          const cleanedNumber = cleanNumber(match);
-          
-          // Ukrainian numbers should never be classified as cards
-          if (cleanedNumber.includes('380') || match.match(/8\s*380/)) {
+    // Додаткова перевірка для 8 380
+    const specificMatch = text.match(/8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/);
+    if (specificMatch) {
+      const digits = specificMatch[0].replace(/[^\d]/g, '');
+      if (digits.includes('380')) {
+        // Витягуємо частину, що починається з 380
+        const index = digits.indexOf('380');
+        let formattedNumber = `+${digits.substring(index)}`;
+        numbers.add(formattedNumber);
+        console.log("Додано 8 380 номер через спеціальну перевірку:", formattedNumber);
+      }
+    } else {
+      phoneRegexPatterns.forEach(regex => {
+        const matches = text.match(regex);
+        if (matches) {
+          matches.forEach(match => {
+            const cleanedNumber = cleanNumber(match);
+            
+            // Українські номери ніколи не повинні класифікуватися як картки
+            if (cleanedNumber.includes('380') || match.match(/8\s*380/)) {
+              const digits = cleanedNumber.replace(/[^\d]/g, '');
+              if (digits.includes('380')) {
+                const index = digits.indexOf('380');
+                const formattedNumber = `+${digits.substring(index)}`;
+                numbers.add(formattedNumber);
+                console.log("Додано український номер зі стандартного шаблону:", formattedNumber);
+              } else {
+                numbers.add(cleanedNumber);
+              }
+              return;
+            }
+            
+            // Пропускаємо, якщо це, ймовірно, номер картки і не містить 380
+            if (isLikelyCardNumber(cleanedNumber) && !cleanedNumber.includes('380')) {
+              return;
+            }
+            
+            // Форматуємо українські номери послідовно
+            let formattedNumber = cleanedNumber;
             const digits = cleanedNumber.replace(/[^\d]/g, '');
+            
             if (digits.includes('380')) {
               const index = digits.indexOf('380');
-              const formattedNumber = `+${digits.substring(index)}`;
-              numbers.add(formattedNumber);
-            } else {
-              numbers.add(cleanedNumber);
+              formattedNumber = `+${digits.substring(index)}`;
+              console.log("Додано відформатований український номер:", formattedNumber);
+            } else if (isLikelyPhoneNumber(cleanedNumber)) {
+              formattedNumber = cleanedNumber;
             }
-            return;
-          }
-          
-          // Skip if it's likely a card number and doesn't contain 380
-          if (isLikelyCardNumber(cleanedNumber) && !cleanedNumber.includes('380')) {
-            return;
-          }
-          
-          // Format Ukrainian numbers consistently
-          let formattedNumber = cleanedNumber;
-          const digits = cleanedNumber.replace(/[^\d]/g, '');
-          
-          if (digits.includes('380')) {
-            const index = digits.indexOf('380');
-            formattedNumber = `+${digits.substring(index)}`;
-          } else if (isLikelyPhoneNumber(cleanedNumber)) {
-            formattedNumber = cleanedNumber;
-          }
-          
-          numbers.add(formattedNumber);
-        });
-      }
-    });
+            
+            numbers.add(formattedNumber);
+          });
+        }
+      });
+    }
   }
   
   return Array.from(numbers);

@@ -22,7 +22,7 @@ export const cardRegexPatterns = [
 
 // Validate if the number is likely a credit card
 export const isLikelyCardNumber = (number: string): boolean => {
-  // CRITICAL: Never classify any string containing 380 or 8 380 as a card
+  // NEVER classify any string containing 380 as a card - Ukrainian phone
   if (number.includes('380') || number.match(/8\s*380/) || number.includes('+380')) {
     return false;
   }
@@ -30,7 +30,7 @@ export const isLikelyCardNumber = (number: string): boolean => {
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
-  // CRITICAL: Never classify numbers with 380 as cards
+  // NEVER classify numbers with 380 as cards
   if (cleaned.includes('380')) {
     return false;
   }
@@ -70,6 +70,7 @@ export const isLikelyCardNumber = (number: string): boolean => {
 export const extractCardNumbers = (text: string, cleanNumber: (number: string) => string): string[] => {
   // Critical preprocessing - NEVER try to extract cards from text containing Ukrainian phone patterns
   if (text.includes('380') || text.match(/8\s*380/) || text.includes('+380')) {
+    console.log("Текст містить український телефонний номер - НЕ шукаємо картки");
     return [];
   }
   
@@ -92,6 +93,7 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
   
   // Critical check again - don't extract cards if there's any trace of 380
   if (cleanedText.includes('380')) {
+    console.log("Текст все ще містить '380' після очищення - НЕ шукаємо картки");
     return [];
   }
   
@@ -104,7 +106,7 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
         const cleanedNumber = cleanNumber(match);
         const digitOnly = cleanedNumber.replace(/\D/g, '');
         
-        // Triple-check to ensure we don't include Ukrainian phone numbers
+        // Троїста перевірка, щоб переконатися, що ми не включаємо номери українських телефонів
         if (!digitOnly.includes('380') && !match.includes('380') && !match.match(/8\s*380/)) {
           if (digitOnly.length >= 13 && digitOnly.length <= 19 && isLikelyCardNumber(cleanedNumber)) {
             numbers.add(cleanedNumber);

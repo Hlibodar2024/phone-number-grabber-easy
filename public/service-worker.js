@@ -1,7 +1,7 @@
 
-// This service worker enables offline access and faster loading
+// Цей Service Worker забезпечує офлайн-доступ і швидше завантаження
 self.addEventListener('install', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v4'; // Incrementing cache version
+  const CACHE_NAME = 'phone-number-grabber-v5'; // Збільшуємо версію кешу
   const BASE_PATH = '/decoder';
   const urlsToCache = [
     `${BASE_PATH}/`,
@@ -14,73 +14,82 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Opened cache');
+        console.log('Відкриття кешу');
         return cache.addAll(urlsToCache)
           .catch(error => {
-            console.log('Failed to cache some resources:', error);
-            // Still continue even if some resources fail
+            console.log('Не вдалося кешувати деякі ресурси:', error);
+            // Продовжуємо, навіть якщо деякі ресурси не кешуються
             return cache.addAll([`${BASE_PATH}/`, `${BASE_PATH}/index.html`]);
           });
       })
   );
-  // Skip waiting to make the new service worker active immediately
+  // Пропускаємо очікування, щоб новий Service Worker був активним негайно
   self.skipWaiting();
 });
 
 self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
-        
-        // Clone the request because it's a one-time use stream
-        const fetchRequest = event.request.clone();
-        
-        return fetch(fetchRequest)
-          .then(response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200) {
-              return response;
-            }
-            
-            // Clone the response because it's a one-time use stream
-            const responseToCache = response.clone();
-            
-            caches.open('phone-number-grabber-v4')
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-            
+  // Перехоплюємо лише запити, що стосуються нашого додатку
+  if (event.request.url.includes('/decoder/')) {
+    event.respondWith(
+      caches.match(event.request)
+        .then((response) => {
+          // Кеш-хіт - повертаємо відповідь
+          if (response) {
             return response;
-          })
-          .catch(() => {
-            // Return a fallback for network errors
-            if (event.request.url.includes('/index.html')) {
-              return caches.match('/decoder/');
-            }
-            return new Response('Network error occurred', {
-              status: 503,
-              headers: new Headers({
-                'Content-Type': 'text/plain'
-              })
+          }
+          
+          // Клонуємо запит, оскільки це одноразовий потік
+          const fetchRequest = event.request.clone();
+          
+          return fetch(fetchRequest)
+            .then(response => {
+              // Перевіряємо, чи отримали ми дійсну відповідь
+              if (!response || response.status !== 200) {
+                return response;
+              }
+              
+              // Клонуємо відповідь, оскільки це одноразовий потік
+              const responseToCache = response.clone();
+              
+              caches.open('phone-number-grabber-v5')
+                .then(cache => {
+                  cache.put(event.request, responseToCache);
+                });
+              
+              return response;
+            })
+            .catch(() => {
+              // Повертаємо запасний варіант для мережевих помилок
+              if (event.request.url.includes('/index.html')) {
+                return caches.match('/decoder/');
+              }
+              // Для зображень і інших ресурсів, показуємо помилку
+              if (event.request.url.includes('.png') || 
+                  event.request.url.includes('.ico') ||
+                  event.request.url.includes('.jpg')) {
+                return new Response(null, {status: 404});
+              }
+              return new Response('Сталася помилка мережі', {
+                status: 503,
+                headers: new Headers({
+                  'Content-Type': 'text/plain'
+                })
+              });
             });
-          });
-      })
-  );
+        })
+    );
+  }
 });
 
 self.addEventListener('activate', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v4'; // Match the updated cache name
+  const CACHE_NAME = 'phone-number-grabber-v5'; // Той самий оновлений кеш
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting outdated cache:', cacheName);
+            console.log('Видалення застарілого кешу:', cacheName);
             return caches.delete(cacheName);
           }
           return null;
@@ -88,6 +97,13 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
-  // Claim clients to control all open clients without reloading
+  // Захоплюємо клієнтів для керування всіма відкритими клієнтами без перезавантаження
   event.waitUntil(clients.claim());
+});
+
+// Обробка повідомлень від клієнтів
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });

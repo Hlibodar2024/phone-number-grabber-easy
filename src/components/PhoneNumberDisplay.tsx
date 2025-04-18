@@ -23,40 +23,32 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   const [displayPhones, setDisplayPhones] = useState<string[]>([]);
   const [displayCards, setDisplayCards] = useState<string[]>([]);
   
-  // Process and reclassify numbers when component mounts or props change
+  // Очищення та рекласифікація номерів при завантаженні компонента чи зміні пропсів
   useEffect(() => {
+    // Спочатку перевіримо наявність номерів з "380" серед карткових номерів
     let newPhones = [...phones];
-    let newCards = [...cards];
-    
-    // Find and reclassify Ukrainian numbers from cards to phones
-    for (let i = newCards.length - 1; i >= 0; i--) {
-      const card = newCards[i];
+    let newCards = [...cards].filter(card => {
       const digitOnly = card.replace(/\D/g, '');
       
-      // If it contains 380 or 8 380, it's a Ukrainian phone number
-      if (digitOnly.includes('380') || card.includes('380') || 
-          card.match(/8\s*380/) || card.includes('+380')) {
-        
-        // Format and add to phones
+      // Якщо номер картки містить "380", переміщуємо його до телефонів
+      if (digitOnly.includes('380')) {
         let formattedNumber;
-        if (digitOnly.includes('380')) {
-          const index = digitOnly.indexOf('380');
-          formattedNumber = `+${digitOnly.substring(index)}`;
-        } else {
-          formattedNumber = card;
-        }
+        // Витяг номера телефону з "380"
+        const index = digitOnly.indexOf('380');
+        formattedNumber = `+${digitOnly.substring(index)}`;
         
-        // Add to phones if not already there
+        // Додавання до телефонів
         if (!newPhones.includes(formattedNumber)) {
           newPhones.push(formattedNumber);
         }
         
-        // Remove from cards
-        newCards.splice(i, 1);
+        // Видаляємо з карток
+        return false;
       }
-    }
+      return true;
+    });
     
-    // Format all phone numbers consistently
+    // Переконуємося, що всі номери телефонів правильно відформатовані
     newPhones = newPhones.map(phone => {
       const digitOnly = phone.replace(/\D/g, '');
       if (digitOnly.includes('380')) {
@@ -70,7 +62,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     setDisplayCards(newCards);
   }, [phones, cards]);
 
-  // Copy to clipboard functionality
+  // Копіювання в буфер обміну
   const copyToClipboard = async (number: string, type: NumberType) => {
     try {
       await navigator.clipboard.writeText(number);
@@ -82,13 +74,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     }
   };
 
-  // Call number functionality
+  // Функція дзвінка
   const callNumber = (number: string) => {
     window.location.href = `tel:${number}`;
     onSelectNumber(number, NumberType.PHONE);
   };
 
-  // Loading state
+  // Стан завантаження
   if (isProcessing) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -101,7 +93,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Empty state
+  // Пустий стан
   if (displayPhones.length === 0 && displayCards.length === 0) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -110,7 +102,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Display found numbers
+  // Відображення знайдених номерів
   return (
     <Card className="p-4 w-full max-w-md mx-auto mt-4">
       {displayPhones.length > 0 && (
