@@ -1,3 +1,4 @@
+
 // Configure phone number regular expressions for different formats
 export const phoneRegexPatterns = [
   // Ukrainian format with proper +380 prefix (HIGHEST PRIORITY)
@@ -15,6 +16,8 @@ export const phoneRegexPatterns = [
   /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
   // Додано: підтримка пробілів для 8 380
   /8\s*380\s*\d{2}\s*\d{3}\s*\d{2}\s*\d{2}/g,
+  // New pattern: handle parentheses around 8 and no separators
+  /\(?8\)?[ ]?380\s*\d{2}\s*\d{3}\s*\d{4}/g,
   // Formats that are likely misrecognized Ukrainian numbers
   /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   // Handle Ukrainian numbers with parentheses
@@ -30,6 +33,11 @@ export const phoneRegexPatterns = [
 
 // Validate if a number matches phone number formats
 export const isLikelyPhoneNumber = (number: string): boolean => {
+  // Immediately classify as phone if contains Ukrainian prefix pattern
+  if (number.includes("380") || number.includes("+380") || number.match(/8\s*380/)) {
+    return true;
+  }
+  
   // Remove all non-digit characters except + for international prefix
   const cleaned = number.replace(/[^\d+]/g, '');
   // Додано: нормалізація пробілів для перевірки
@@ -41,7 +49,7 @@ export const isLikelyPhoneNumber = (number: string): boolean => {
   }
   
   // Check for format "8 380" which is also a Ukrainian phone number
-  if (normalized.match(/8\s*380/)) {
+  if (normalized.match(/8\s*380/) || number.match(/8\s*380/) || cleaned.match(/8380/)) {
     return true;
   }
   
@@ -68,6 +76,8 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
     /[\(]?8[\)]?\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
     // Critical pattern: 8 380 format
     /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+    // New pattern for (8 +380 format
+    /\(?8\)?[ ]?[+]?380\s*\d{2}\s*\d{3}\s*\d{4}/g,
     // Another critical format
     /1\s?8\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
   ];
@@ -97,7 +107,8 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
           const cleanedNumber = cleanNumber(match);
           
           // Ukrainian numbers should never be classified as cards
-          if (cleanedNumber.includes('380') || match.match(/8\s*380/)) {
+          if (cleanedNumber.includes('380') || match.includes('380') || match.match(/8\s*380/) || 
+              cleanedNumber.match(/8\s*380/) || match.match(/\(?8\)?[ ]?[+]?380/)) {
             const digits = cleanedNumber.replace(/[^\d]/g, '');
             if (digits.includes('380')) {
               const index = digits.indexOf('380');
