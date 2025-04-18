@@ -20,45 +20,57 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   onSelectNumber,
   isProcessing = false
 }) => {
-  // Ensure any Ukrainian phone number in cards array is moved to phones
+  // Переконуємось, що будь-який український номер телефону з масиву cards переміщений до phones
   let formattedPhones = [...phones];
   let filteredCards = [...cards];
   
-  // Move any misidentified Ukrainian numbers from cards to phones
+  // Переміщуємо неправильно ідентифіковані українські номери з cards до phones
   for (let i = filteredCards.length - 1; i >= 0; i--) {
     const card = filteredCards[i];
-    if (card.includes('380') || (card.match(/^8\s?380/) || card.includes('+380'))) {
-      // Format and add to phones
+    const digitOnly = card.replace(/\D/g, '');
+    
+    // Перевіряємо будь-які українські формати
+    if (card.includes('380') || card.includes('+380') || 
+        card.match(/8\s*380/) || digitOnly.includes('380')) {
+      
+      // Форматуємо та додаємо до phones
       let formatted = card;
-      if (card.match(/^8\s?380/)) {
-        formatted = `+${card.replace(/^8\s?/, '')}`;
-      } else if (!card.startsWith('+')) {
-        const match = card.match(/380\d+/);
-        if (match) {
-          formatted = `+${match[0]}`;
+      const digitOnly = card.replace(/\D/g, '');
+      
+      // Обробка різних форматів українських номерів
+      if (digitOnly.includes('380')) {
+        const index = digitOnly.indexOf('380');
+        formatted = `+${digitOnly.substring(index)}`;
+      } else if (card.match(/8\s*380/)) {
+        // Формат "8 380"
+        const cleaned = card.replace(/[^\d]/g, '');
+        if (cleaned.startsWith('8380')) {
+          formatted = `+${cleaned.substring(1)}`;
         }
       }
       
+      // Додаємо до телефонів, якщо такого ще немає
       if (!formattedPhones.includes(formatted)) {
         formattedPhones.push(formatted);
       }
-      // Remove from cards
+      
+      // Видаляємо з карток
       filteredCards.splice(i, 1);
     }
   }
 
-  // Format phone numbers for consistent display
+  // Форматуємо телефонні номери для узгодженого відображення
   formattedPhones = formattedPhones.map(phone => {
-    if (phone.includes('380') && !phone.startsWith('+')) {
-      if (phone.match(/^8\s?380/)) {
-        return `+${phone.replace(/^8\s?/, '')}`;
-      } else if (phone.startsWith('380')) {
-        return `+${phone}`;
-      }
+    const digitOnly = phone.replace(/\D/g, '');
+    
+    if (digitOnly.includes('380')) {
+      const index = digitOnly.indexOf('380');
+      return `+${digitOnly.substring(index)}`;
     }
     return phone;
   });
 
+  // Копіювання в буфер обміну
   const copyToClipboard = async (number: string, type: NumberType) => {
     try {
       await navigator.clipboard.writeText(number);
@@ -70,12 +82,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     }
   };
 
+  // Виклик номера
   const callNumber = (number: string) => {
     window.location.href = `tel:${number}`;
     onSelectNumber(number, NumberType.PHONE);
   };
 
-  // Show loading state
+  // Показуємо стан завантаження
   if (isProcessing) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -88,7 +101,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Display empty state only when not processing and no numbers
+  // Відображення пустого стану
   if (formattedPhones.length === 0 && filteredCards.length === 0) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -97,7 +110,7 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Display found numbers
+  // Відображення знайдених номерів
   return (
     <Card className="p-4 w-full max-w-md mx-auto mt-4">
       {formattedPhones.length > 0 && (

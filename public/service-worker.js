@@ -1,7 +1,7 @@
 
 // This service worker enables offline access and faster loading
 self.addEventListener('install', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v3'; // Incrementing cache version
+  const CACHE_NAME = 'phone-number-grabber-v4'; // Incrementing cache version
   const BASE_PATH = '/decoder';
   const urlsToCache = [
     `${BASE_PATH}/`,
@@ -42,14 +42,14 @@ self.addEventListener('fetch', (event) => {
         return fetch(fetchRequest)
           .then(response => {
             // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
+            if (!response || response.status !== 200) {
               return response;
             }
             
             // Clone the response because it's a one-time use stream
             const responseToCache = response.clone();
             
-            caches.open('phone-number-grabber-v3')
+            caches.open('phone-number-grabber-v4')
               .then(cache => {
                 cache.put(event.request, responseToCache);
               });
@@ -73,13 +73,14 @@ self.addEventListener('fetch', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v3'; // Match the updated cache name
+  const CACHE_NAME = 'phone-number-grabber-v4'; // Match the updated cache name
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
+            console.log('Deleting outdated cache:', cacheName);
             return caches.delete(cacheName);
           }
           return null;
