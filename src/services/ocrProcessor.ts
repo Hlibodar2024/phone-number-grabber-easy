@@ -18,7 +18,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789 +-()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
       preserve_interword_spaces: '1',
-      tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Use the enum value instead of a number
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK,
     });
     
     console.log("Starting OCR recognition...");
@@ -40,18 +40,16 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     const potentialNumbers = extractPotentialNumbers(processedText);
     console.log("Potential numbers:", potentialNumbers);
     
-    // КРИТИЧНІ ЗМІНИ: Спочатку шукаємо українські телефони з форматом 380
+    // ALL TEXTS THAT HAVE "380" OR "8 380" MUST BE PRIMARILY CLASSIFIED AS PHONES, NEVER CARDS
+    // This is critically important - Ukrainian numbers must be properly identified first
     const rawText = data.text + " " + processedText;
     let phones: string[] = [];
-    let foundUkrainianNumbers = false;
     
-    // Ключовий момент: навіть якщо текст містить "8 380", це гарантовано український номер
+    // FIRST PASS: Look explicitly for Ukrainian phone numbers and prioritize them
     if (rawText.includes("380") || rawText.includes("+380") || 
         rawText.match(/8\s*380/) || rawText.match(/\+?\s?380/)) {
       
-      foundUkrainianNumbers = true;
-      
-      // Прямий пошук українських шаблонів
+      // All these patterns are guaranteed to be Ukrainian phone numbers
       const ukrainianPatterns = [
         /\+?\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
         /\+?\s?380\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g,
@@ -63,39 +61,32 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
         /8\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g
       ];
       
-      ukrainianPatterns.forEach(pattern => {
+      // PRIORITY: Check for actual patterns first
+      for (const pattern of ukrainianPatterns) {
         const matches = rawText.match(pattern);
         if (matches && matches.length > 0) {
           matches.forEach(match => {
             if (match) {
-              // Видаляємо нецифрові символи, крім +
-              let cleaned = match.replace(/[^\d+]/g, '');
-              
-              // Форматуємо з префіксом +380
+              // Format properly with +380 prefix
+              const digits = match.replace(/[^\d]/g, '');
               let formattedPhone;
               
-              if (cleaned.startsWith('8380')) {
-                formattedPhone = `+${cleaned.substring(1)}`;
-              } else if (cleaned.match(/^1?8?380/)) {
-                const digits = cleaned.match(/380(\d+)/)[1];
-                formattedPhone = `+380${digits}`;
-              } else if (cleaned.startsWith('380')) {
-                formattedPhone = `+${cleaned}`;
-              } else if (cleaned.includes('380')) {
-                const index = cleaned.indexOf('380');
-                formattedPhone = `+${cleaned.substring(index)}`;
-              }
-              
-              if (formattedPhone && !phones.includes(formattedPhone)) {
-                phones.push(formattedPhone);
+              if (digits.includes('380')) {
+                const index = digits.indexOf('380');
+                formattedPhone = `+${digits.substring(index)}`;
+                
+                if (formattedPhone && !phones.includes(formattedPhone)) {
+                  phones.push(formattedPhone);
+                }
               }
             }
           });
         }
-      });
+      }
       
-      // Якщо попередній підхід не допоміг, спробуємо знайти окремо "8 380"
+      // If no phones found yet but we know there's "380" somewhere, look harder
       if (phones.length === 0) {
+        // Look for "8 380" format specifically
         const match = rawText.match(/8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/);
         if (match) {
           const cleaned = match[0].replace(/[^\d]/g, '');
@@ -106,7 +97,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
         }
       }
       
-      // Ще один шанс знайти будь-які цифри після 380
+      // Last resort: find any digits following 380
       if (phones.length === 0) {
         const pattern = /380\s*\d{2}\s*\d{3}\s*\d{4}/g;
         const matches = rawText.match(pattern);
@@ -122,43 +113,40 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
           });
         }
       }
-    }
-    
-    // Якщо все ще не знайшли українські номери, спробуємо загальний метод
-    if (!foundUkrainianNumbers || phones.length === 0) {
-      phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
-    }
-    
-    // Кінцева перевірка: шукаємо картки, ЛИШЕ після того, як всі телефони належним чином ідентифіковані
-    let cards = extractCardNumbers(processedText, cleanNumber);
-    
-    // КРИТИЧНИЙ МОМЕНТ: фільтруємо будь-які картки, які насправді є українськими номерами
-    cards = cards.filter(card => {
-      const digitOnly = card.replace(/\D/g, '');
-      return !digitOnly.includes('380');
-    });
-    
-    // Якщо виявлено карту з "380", переносимо її в телефони
-    for (let i = cards.length - 1; i >= 0; i--) {
-      const card = cards[i];
-      if (card.includes('380') || card.includes('+380') || card.match(/8\s?380/)) {
-        // Видаляємо з карток
-        cards.splice(i, 1);
-        
-        // Форматуємо й додаємо до телефонів, якщо ще не додано
-        let formatted = card;
-        const digits = card.replace(/[^\d]/g, '');
-        
-        if (digits.includes('380')) {
-          const index = digits.indexOf('380');
-          formatted = `+${digits.substring(index)}`;
-          
-          if (!phones.includes(formatted)) {
-            phones.push(formatted);
+      
+      // ABSOLUTE LAST RESORT: If we found "380" but still no phone,
+      // check for any sequence that might be a phone
+      if (phones.length === 0) {
+        const digitSequences = rawText.match(/\d{8,}/g) || [];
+        for (const seq of digitSequences) {
+          if (seq.includes('380')) {
+            const index = seq.indexOf('380');
+            const formattedPhone = `+${seq.substring(index)}`;
+            phones.push(formattedPhone);
           }
         }
       }
     }
+    
+    // If we still haven't found Ukrainian phones through direct patterns, try regular extraction
+    if (phones.length === 0) {
+      phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
+    }
+    
+    // Only look for cards now, AFTER ensuring all Ukrainian numbers are identified as phones
+    // AND filter all card candidates to ensure they don't contain 380
+    let cards = [];
+    
+    // Only extract card numbers if we're sure there are no Ukrainian phones misclassified
+    if (!rawText.includes("380") && !rawText.match(/8\s*380/)) {
+      cards = extractCardNumbers(processedText, cleanNumber);
+    }
+    
+    // Final filtering to ensure NO Ukrainian phone is misclassified as a card
+    cards = cards.filter(card => {
+      const digits = card.replace(/\D/g, '');
+      return !digits.includes('380') && !card.match(/8\s*380/);
+    });
     
     console.log("Extracted phones:", phones);
     console.log("Extracted cards:", cards);

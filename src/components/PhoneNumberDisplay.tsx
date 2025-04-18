@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Copy, Phone, CreditCard, Loader2 } from 'lucide-react';
@@ -20,57 +20,57 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   onSelectNumber,
   isProcessing = false
 }) => {
-  // Переконуємось, що будь-який український номер телефону з масиву cards переміщений до phones
-  let formattedPhones = [...phones];
-  let filteredCards = [...cards];
+  const [displayPhones, setDisplayPhones] = useState<string[]>([]);
+  const [displayCards, setDisplayCards] = useState<string[]>([]);
   
-  // Переміщуємо неправильно ідентифіковані українські номери з cards до phones
-  for (let i = filteredCards.length - 1; i >= 0; i--) {
-    const card = filteredCards[i];
-    const digitOnly = card.replace(/\D/g, '');
+  // Process and reclassify numbers when component mounts or props change
+  useEffect(() => {
+    let newPhones = [...phones];
+    let newCards = [...cards];
     
-    // Перевіряємо будь-які українські формати
-    if (card.includes('380') || card.includes('+380') || 
-        card.match(/8\s*380/) || digitOnly.includes('380')) {
-      
-      // Форматуємо та додаємо до phones
-      let formatted = card;
+    // Find and reclassify Ukrainian numbers from cards to phones
+    for (let i = newCards.length - 1; i >= 0; i--) {
+      const card = newCards[i];
       const digitOnly = card.replace(/\D/g, '');
       
-      // Обробка різних форматів українських номерів
+      // If it contains 380 or 8 380, it's a Ukrainian phone number
+      if (digitOnly.includes('380') || card.includes('380') || 
+          card.match(/8\s*380/) || card.includes('+380')) {
+        
+        // Format and add to phones
+        let formattedNumber;
+        if (digitOnly.includes('380')) {
+          const index = digitOnly.indexOf('380');
+          formattedNumber = `+${digitOnly.substring(index)}`;
+        } else {
+          formattedNumber = card;
+        }
+        
+        // Add to phones if not already there
+        if (!newPhones.includes(formattedNumber)) {
+          newPhones.push(formattedNumber);
+        }
+        
+        // Remove from cards
+        newCards.splice(i, 1);
+      }
+    }
+    
+    // Format all phone numbers consistently
+    newPhones = newPhones.map(phone => {
+      const digitOnly = phone.replace(/\D/g, '');
       if (digitOnly.includes('380')) {
         const index = digitOnly.indexOf('380');
-        formatted = `+${digitOnly.substring(index)}`;
-      } else if (card.match(/8\s*380/)) {
-        // Формат "8 380"
-        const cleaned = card.replace(/[^\d]/g, '');
-        if (cleaned.startsWith('8380')) {
-          formatted = `+${cleaned.substring(1)}`;
-        }
+        return `+${digitOnly.substring(index)}`;
       }
-      
-      // Додаємо до телефонів, якщо такого ще немає
-      if (!formattedPhones.includes(formatted)) {
-        formattedPhones.push(formatted);
-      }
-      
-      // Видаляємо з карток
-      filteredCards.splice(i, 1);
-    }
-  }
-
-  // Форматуємо телефонні номери для узгодженого відображення
-  formattedPhones = formattedPhones.map(phone => {
-    const digitOnly = phone.replace(/\D/g, '');
+      return phone;
+    });
     
-    if (digitOnly.includes('380')) {
-      const index = digitOnly.indexOf('380');
-      return `+${digitOnly.substring(index)}`;
-    }
-    return phone;
-  });
+    setDisplayPhones(newPhones);
+    setDisplayCards(newCards);
+  }, [phones, cards]);
 
-  // Копіювання в буфер обміну
+  // Copy to clipboard functionality
   const copyToClipboard = async (number: string, type: NumberType) => {
     try {
       await navigator.clipboard.writeText(number);
@@ -82,13 +82,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     }
   };
 
-  // Виклик номера
+  // Call number functionality
   const callNumber = (number: string) => {
     window.location.href = `tel:${number}`;
     onSelectNumber(number, NumberType.PHONE);
   };
 
-  // Показуємо стан завантаження
+  // Loading state
   if (isProcessing) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
@@ -101,8 +101,8 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Відображення пустого стану
-  if (formattedPhones.length === 0 && filteredCards.length === 0) {
+  // Empty state
+  if (displayPhones.length === 0 && displayCards.length === 0) {
     return (
       <Card className="p-4 w-full max-w-md mx-auto mt-4">
         <p className="text-center text-gray-500">Номери не знайдено</p>
@@ -110,16 +110,16 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
     );
   }
 
-  // Відображення знайдених номерів
+  // Display found numbers
   return (
     <Card className="p-4 w-full max-w-md mx-auto mt-4">
-      {formattedPhones.length > 0 && (
+      {displayPhones.length > 0 && (
         <>
           <h3 className="text-lg font-medium mb-3 flex items-center">
             <Phone className="mr-2 h-5 w-5" /> Знайдені номери телефонів:
           </h3>
           <div className="space-y-2 mb-4">
-            {formattedPhones.map((number, index) => (
+            {displayPhones.map((number, index) => (
               <div key={`phone-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                 <span className="font-medium">{number}</span>
                 <div className="flex gap-2">
@@ -148,13 +148,13 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
         </>
       )}
 
-      {filteredCards.length > 0 && (
+      {displayCards.length > 0 && (
         <>
           <h3 className="text-lg font-medium mb-3 flex items-center">
             <CreditCard className="mr-2 h-5 w-5" /> Знайдені номери карток:
           </h3>
           <div className="space-y-2">
-            {filteredCards.map((number, index) => (
+            {displayCards.map((number, index) => (
               <div key={`card-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
                 <span className="font-medium">{number}</span>
                 <div className="flex gap-2">

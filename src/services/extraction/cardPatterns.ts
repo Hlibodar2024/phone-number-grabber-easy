@@ -22,21 +22,16 @@ export const cardRegexPatterns = [
 
 // Validate if the number is likely a credit card
 export const isLikelyCardNumber = (number: string): boolean => {
+  // CRITICAL: Never classify any string containing 380 or 8 380 as a card
+  if (number.includes('380') || number.match(/8\s*380/) || number.includes('+380')) {
+    return false;
+  }
+  
   // Remove all spaces and non-digit characters
   const cleaned = number.replace(/\D/g, '');
   
-  // КРИТИЧНІ ЗМІНИ: ніколи не класифікувати як картку номери з 380
+  // CRITICAL: Never classify numbers with 380 as cards
   if (cleaned.includes('380')) {
-    return false;
-  }
-  
-  // Перевіряємо формат 8 380, який також є українським телефонним номером
-  if (number.match(/8\s*380/)) {
-    return false;
-  }
-  
-  // Перевіряємо +380, який є українським телефонним номером
-  if (number.includes('+380')) {
     return false;
   }
   
@@ -73,7 +68,12 @@ export const isLikelyCardNumber = (number: string): boolean => {
 
 // Extract credit card numbers from text
 export const extractCardNumbers = (text: string, cleanNumber: (number: string) => string): string[] => {
-  // КРИТИЧНІ ЗМІНИ: попередньо обробляємо тексти, щоб виключити ВСІ шаблони українських телефонів
+  // Critical preprocessing - NEVER try to extract cards from text containing Ukrainian phone patterns
+  if (text.includes('380') || text.match(/8\s*380/) || text.includes('+380')) {
+    return [];
+  }
+  
+  // Remove Ukrainian phone patterns completely before processing
   let cleanedText = text;
   const ukrainianPhonePatterns = [
     /[8\s]+380\s?\d{2}\s?\d{3}\s?\d{4}/g,
@@ -86,17 +86,16 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
     /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
   ];
   
-  // Видаляємо всі шаблони українських телефонів з тексту перед пошуком карток
   ukrainianPhonePatterns.forEach(pattern => {
     cleanedText = cleanedText.replace(pattern, '');
   });
   
-  const numbers = new Set<string>();
-  
-  // Переконуємося, що в тексті немає "380" взагалі перед пошуком карток
-  if (cleanedText.includes('380') || cleanedText.match(/8\s*380/)) {
+  // Critical check again - don't extract cards if there's any trace of 380
+  if (cleanedText.includes('380')) {
     return [];
   }
+  
+  const numbers = new Set<string>();
   
   cardRegexPatterns.forEach(regex => {
     const matches = cleanedText.match(regex);
@@ -105,13 +104,11 @@ export const extractCardNumbers = (text: string, cleanNumber: (number: string) =
         const cleanedNumber = cleanNumber(match);
         const digitOnly = cleanedNumber.replace(/\D/g, '');
         
-        // Подвійна перевірка для виключення будь-чого з 380
-        if (digitOnly.includes('380') || match.includes('380') || match.match(/8\s*380/)) {
-          return;
-        }
-        
-        if (digitOnly.length >= 13 && digitOnly.length <= 19 && isLikelyCardNumber(cleanedNumber)) {
-          numbers.add(cleanedNumber);
+        // Triple-check to ensure we don't include Ukrainian phone numbers
+        if (!digitOnly.includes('380') && !match.includes('380') && !match.match(/8\s*380/)) {
+          if (digitOnly.length >= 13 && digitOnly.length <= 19 && isLikelyCardNumber(cleanedNumber)) {
+            numbers.add(cleanedNumber);
+          }
         }
       });
     }

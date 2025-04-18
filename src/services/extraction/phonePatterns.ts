@@ -9,12 +9,12 @@ export const phoneRegexPatterns = [
   // Ukrainian formats with extended understanding of "8+380"
   /[8\s]+[+]?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
   /[8\s]+380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
+  // Critical pattern: 8 380 format - this is always a Ukrainian number
+  /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
   // Formats that are likely misrecognized Ukrainian numbers
   /[1\s]?[8\s]?380[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
   // Handle Ukrainian numbers with parentheses
   /\(?[8\s]?380\)?[-\s]?\d{2}[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}/g,
-  // ДОДАНИЙ новий шаблон для "8 380" формату
-  /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
   // International formats
   /\+\d{1,3}[-\s]?\(?\d{1,4}\)?[-\s]?\d{1,4}[-\s]?\d{1,9}/g,
   // Basic number format with potential separators
@@ -30,11 +30,11 @@ export const isLikelyPhoneNumber = (number: string): boolean => {
   const cleaned = number.replace(/[^\d+]/g, '');
   
   // CRITICAL: ANY sequence with 380 should be considered a Ukrainian phone number
-  if (cleaned.includes('380')) {
+  if (cleaned.includes('380') || number.includes('380')) {
     return true;
   }
   
-  // Перевірка формату "8 380"
+  // Check for format "8 380" which is also a Ukrainian phone number
   if (number.match(/8\s*380/)) {
     return true;
   }
@@ -60,8 +60,10 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
     /[8\s]+[+]?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
     /[8\s]+380\s?\d{2}\s?\d{3}\s?\d{2}\s?\d{2}/g,
     /[\(]?8[\)]?\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
-    // ДОДАНИЙ новий шаблон для "8 380" формату
+    // Critical pattern: 8 380 format
     /8\s*380\s*\d{2}\s*\d{3}\s*\d{4}/g,
+    // Another critical format
+    /1\s?8\s?380\s?\d{2}\s?\d{3}\s?\d{4}/g,
   ];
   
   for (const pattern of directUkrainianPatterns) {
@@ -88,8 +90,23 @@ export const extractPhoneNumbers = (text: string, cleanNumber: (number: string) 
         matches.forEach(match => {
           const cleanedNumber = cleanNumber(match);
           
+          // Ukrainian numbers should never be classified as cards
+          if (cleanedNumber.includes('380') || match.match(/8\s*380/)) {
+            const digits = cleanedNumber.replace(/[^\d]/g, '');
+            if (digits.includes('380')) {
+              const index = digits.indexOf('380');
+              const formattedNumber = `+${digits.substring(index)}`;
+              numbers.add(formattedNumber);
+            } else {
+              numbers.add(cleanedNumber);
+            }
+            return;
+          }
+          
           // Skip if it's likely a card number and doesn't contain 380
-          if (isLikelyCardNumber(cleanedNumber) && !cleanedNumber.includes('380')) return;
+          if (isLikelyCardNumber(cleanedNumber) && !cleanedNumber.includes('380')) {
+            return;
+          }
           
           // Format Ukrainian numbers consistently
           let formattedNumber = cleanedNumber;
