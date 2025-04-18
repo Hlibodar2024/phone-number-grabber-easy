@@ -1,13 +1,14 @@
 
 // This service worker enables offline access and faster loading
 self.addEventListener('install', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v2'; // Incrementing cache version
+  const CACHE_NAME = 'phone-number-grabber-v3'; // Incrementing cache version
   const BASE_PATH = '/decoder';
   const urlsToCache = [
     `${BASE_PATH}/`,
     `${BASE_PATH}/index.html`,
-    `${BASE_PATH}/manifest.json`
-    // Removing icon references to prevent caching errors
+    `${BASE_PATH}/manifest.json`,
+    `${BASE_PATH}/favicon.ico`,
+    `${BASE_PATH}/icon-192x192.png`
   ];
   
   event.waitUntil(
@@ -38,24 +39,41 @@ self.addEventListener('fetch', (event) => {
         // Clone the request because it's a one-time use stream
         const fetchRequest = event.request.clone();
         
-        return fetch(fetchRequest).catch(() => {
-          // Return a fallback for network errors
-          if (event.request.url.includes('/index.html')) {
-            return caches.match('/decoder/');
-          }
-          return new Response('Network error occurred', {
-            status: 503,
-            headers: new Headers({
-              'Content-Type': 'text/plain'
-            })
+        return fetch(fetchRequest)
+          .then(response => {
+            // Check if we received a valid response
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+            
+            // Clone the response because it's a one-time use stream
+            const responseToCache = response.clone();
+            
+            caches.open('phone-number-grabber-v3')
+              .then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            
+            return response;
+          })
+          .catch(() => {
+            // Return a fallback for network errors
+            if (event.request.url.includes('/index.html')) {
+              return caches.match('/decoder/');
+            }
+            return new Response('Network error occurred', {
+              status: 503,
+              headers: new Headers({
+                'Content-Type': 'text/plain'
+              })
+            });
           });
-        });
       })
   );
 });
 
 self.addEventListener('activate', (event) => {
-  const CACHE_NAME = 'phone-number-grabber-v2'; // Match the updated cache name
+  const CACHE_NAME = 'phone-number-grabber-v3'; // Match the updated cache name
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {

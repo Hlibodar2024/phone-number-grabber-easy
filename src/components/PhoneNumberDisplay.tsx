@@ -20,16 +20,41 @@ const PhoneNumberDisplay: React.FC<PhoneNumberDisplayProps> = ({
   onSelectNumber,
   isProcessing = false
 }) => {
-  // Ensure no Ukrainian phone numbers appear in cards array
-  const filteredCards = cards.filter(card => {
-    // Check if card contains '380' which indicates it's likely a phone number
-    return !card.includes('380') && !card.includes('+380');
-  });
+  // Ensure any Ukrainian phone number in cards array is moved to phones
+  let formattedPhones = [...phones];
+  let filteredCards = [...cards];
+  
+  // Move any misidentified Ukrainian numbers from cards to phones
+  for (let i = filteredCards.length - 1; i >= 0; i--) {
+    const card = filteredCards[i];
+    if (card.includes('380') || (card.match(/^8\s?380/) || card.includes('+380'))) {
+      // Format and add to phones
+      let formatted = card;
+      if (card.match(/^8\s?380/)) {
+        formatted = `+${card.replace(/^8\s?/, '')}`;
+      } else if (!card.startsWith('+')) {
+        const match = card.match(/380\d+/);
+        if (match) {
+          formatted = `+${match[0]}`;
+        }
+      }
+      
+      if (!formattedPhones.includes(formatted)) {
+        formattedPhones.push(formatted);
+      }
+      // Remove from cards
+      filteredCards.splice(i, 1);
+    }
+  }
 
   // Format phone numbers for consistent display
-  const formattedPhones = phones.map(phone => {
+  formattedPhones = formattedPhones.map(phone => {
     if (phone.includes('380') && !phone.startsWith('+')) {
-      return `+${phone.replace(/^8\s?/, '')}`;
+      if (phone.match(/^8\s?380/)) {
+        return `+${phone.replace(/^8\s?/, '')}`;
+      } else if (phone.startsWith('380')) {
+        return `+${phone}`;
+      }
     }
     return phone;
   });
