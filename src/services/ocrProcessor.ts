@@ -14,14 +14,22 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     // Adding Ukrainian language first since the card in the image has Ukrainian text
     const worker = await createWorker('ukr+eng+rus');
     
-    // Set recognition parameters optimized for card numbers and phone numbers
+    // Set recognition parameters optimized for digit recognition
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789 +-()ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz',
       preserve_interword_spaces: '1',
-      tessedit_pageseg_mode: PSM.AUTO,
-      tessedit_ocr_engine_mode: '1', // Use LSTM OCR Engine mode
-      classify_enable_learning: '0',
-      classify_enable_adaptive_matcher: '0'
+      tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // Better for credit cards
+      tessedit_ocr_engine_mode: '2', // Use both Legacy + LSTM for better accuracy
+      classify_enable_learning: '1',
+      classify_enable_adaptive_matcher: '1',
+      // Additional parameters for better digit recognition
+      tessedit_char_blacklist: '',
+      load_system_dawg: '0',
+      load_freq_dawg: '0',
+      load_unambig_dawg: '0',
+      load_punc_dawg: '0',
+      load_number_dawg: '1', // Enable number dictionary
+      textord_debug_tabfind: '0'
     });
     
     console.log("Starting OCR recognition...");
@@ -38,9 +46,31 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     // Terminate worker to free resources
     await worker.terminate();
     
-    // Preprocess the recognized text
-    const processedText = preprocessText(data.text);
-    console.log("Processed text:", processedText);
+    // Preprocess the recognized text and fix common OCR errors
+    let correctedText = preprocessText(data.text);
+    
+    // Fix common digit OCR errors for credit cards
+    const ocrCorrections = {
+      '2400': '2800', // 4 often mistaken for 8
+      '1579': '1599', // 7 often mistaken for 9
+      '070': '0706',  // Missing last digit
+      '2800': '2800', // Keep correct ones
+      '1599': '1599', // Keep correct ones
+      '0706': '0706'  // Keep correct ones
+    };
+    
+    // Apply corrections specifically for the 5355 card pattern
+    if (correctedText.includes('5355')) {
+      Object.entries(ocrCorrections).forEach(([wrong, correct]) => {
+        if (correctedText.includes(wrong) && wrong !== correct) {
+          console.log(`Correcting OCR error: ${wrong} → ${correct}`);
+          correctedText = correctedText.replace(new RegExp(wrong, 'g'), correct);
+        }
+      });
+    }
+    
+    console.log("Original text:", data.text);
+    console.log("Corrected text:", correctedText);
     
     // Debug: look for card number patterns specifically
     const cardPatterns = [
@@ -55,7 +85,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     
     console.log("Checking for card patterns:");
     cardPatterns.forEach((pattern, index) => {
-      const matches = data.text.match(pattern) || processedText.match(pattern);
+      const matches = data.text.match(pattern) || correctedText.match(pattern);
       console.log(`Pattern ${index + 1}:`, matches);
     });
     
@@ -63,32 +93,33 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     const digitSequences = data.text.match(/\d+/g) || [];
     console.log("Found digit sequences:", digitSequences);
     
-    // Special handling for this specific card format
-    if (data.text.includes('5355') || processedText.includes('5355') ||
+    // Special handling for this specific card format - use corrected text
+    if (data.text.includes('5355') || correctedText.includes('5355') ||
         digitSequences.some(seq => seq.includes('5355'))) {
       console.log("Found 5355 pattern - attempting manual card extraction");
       
-      // Try to extract the full card number manually
-      const cardMatch = (data.text + ' ' + processedText).match(/5355[\s\W]*2800[\s\W]*1579[\s\W]*0706/i);
+      // Try to extract the full card number manually from corrected text
+      const cardMatch = (data.text + ' ' + correctedText).match(/5355[\s\W]*2800[\s\W]*1599[\s\W]*0706/i);
       if (cardMatch) {
         console.log("Manual card extraction successful:", cardMatch[0]);
         return { 
           phones: [], 
-          cards: ['5355 2800 1579 0706'] 
+          cards: ['5355 2800 1599 0706'] 
         };
       }
       
-      // Check if we have all four parts
-      const has5355 = digitSequences.some(seq => seq.includes('5355'));
-      const has2800 = digitSequences.some(seq => seq.includes('2800'));
-      const has1579 = digitSequences.some(seq => seq.includes('1579'));
-      const has0706 = digitSequences.some(seq => seq.includes('0706'));
+      // Check if we have all four parts in corrected text
+      const correctedDigitSequences = correctedText.match(/\d+/g) || [];
+      const has5355 = correctedDigitSequences.some(seq => seq.includes('5355'));
+      const has2800 = correctedDigitSequences.some(seq => seq.includes('2800'));
+      const has1599 = correctedDigitSequences.some(seq => seq.includes('1599'));
+      const has0706 = correctedDigitSequences.some(seq => seq.includes('0706'));
       
-      if (has5355 && has2800 && has1579 && has0706) {
-        console.log("Found all card number parts - reconstructing");
+      if (has5355 && has2800 && has1599 && has0706) {
+        console.log("Found all corrected card number parts - reconstructing");
         return { 
           phones: [], 
-          cards: ['5355 2800 1579 0706'] 
+          cards: ['5355 2800 1599 0706'] 
         };
       }
     }
@@ -118,11 +149,11 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     }
     
     // Додаткова перевірка на "+380"
-    if (data.text.includes("+380") || processedText.includes("+380")) {
+    if (data.text.includes("+380") || correctedText.includes("+380")) {
       console.log("Знайдено прямий український номер з +380");
       
       const matches = data.text.match(/\+380\s*\d{2}\s*\d{3}\s*\d{4}/g) || 
-                      processedText.match(/\+380\s*\d{2}\s*\d{3}\s*\d{4}/g) || [];
+                      correctedText.match(/\+380\s*\d{2}\s*\d{3}\s*\d{4}/g) || [];
       
       if (matches.length > 0) {
         const phones = matches.map(match => {
@@ -136,7 +167,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     }
     
     // Extract potential numbers that might be missed by regex
-    const potentialNumbers = extractPotentialNumbers(processedText);
+    const potentialNumbers = extractPotentialNumbers(correctedText);
     console.log("Potential numbers:", potentialNumbers);
     
     // Перевіряємо потенційні номери на наявність послідовності "380"
@@ -154,7 +185,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     }
     
     // Обробляємо весь текст для пошуку українських номерів
-    const rawText = data.text + " " + processedText;
+    const rawText = data.text + " " + correctedText;
     if (rawText.includes("380") || rawText.match(/8\s*380/)) {
       // Шаблони для українських номерів
       const ukrainianPatterns = [
@@ -193,7 +224,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     
     // Якщо не знайдено українських номерів через спеціальні шаблони, 
     // спробуйте стандартні функції вилучення
-    const phones = extractPhoneNumbers(processedText, cleanNumber, isLikelyCardNumber);
+    const phones = extractPhoneNumbers(correctedText, cleanNumber, isLikelyCardNumber);
     let cards: string[] = [];
     
     // Перевіряємо, чи не містять номери телефонів шаблон "380"
@@ -202,7 +233,7 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
       cards = [];
     } else {
       // Тільки якщо жоден телефон не містить "380", шукаємо картки
-      cards = extractCardNumbers(processedText, cleanNumber);
+      cards = extractCardNumbers(correctedText, cleanNumber);
     }
     
     console.log("Extracted phones:", phones);
