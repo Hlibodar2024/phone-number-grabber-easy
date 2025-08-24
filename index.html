@@ -7,11 +7,11 @@
     <title>Витягти номер телефону</title>
     <meta name="description" content="Додаток для розпізнавання номерів телефону з зображень та скріншотів" />
     <meta name="author" content="Lovable" />
-    <link rel="manifest" href="/decoder/manifest.json" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
-    <link rel="icon" href="/decoder/favicon.ico" type="image/x-icon" />
-    <link rel="shortcut icon" href="/decoder/favicon.ico" type="image/x-icon" />
-    <link rel="apple-touch-icon" href="/decoder/icon-192x192.png" />
+    <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
+    <link rel="apple-touch-icon" href="/icon-192x192.png" />
 
     <meta property="og:title" content="Витягти номер телефону" />
     <meta property="og:description" content="Додаток для розпізнавання номерів телефону з зображень та скріншотів" />
@@ -26,11 +26,11 @@
   <body>
     <div id="root"></div>
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <script type="module" src="/decoder/src/main.tsx"></script>
+    <script type="module" src="./src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/decoder/service-worker.js', { scope: '/decoder/' })
+          navigator.serviceWorker.register('/service-worker.js')
             .then(registration => {
               console.log('ServiceWorker registration successful');
             })
