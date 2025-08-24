@@ -22,19 +22,35 @@ export const extractNumbersFromImage = async (imageSrc: string): Promise<{
     });
     
     console.log("Starting OCR recognition...");
+    console.log("Image source:", imageSrc.substring(0, 50) + "..."); // Log image source for debugging
     
     // Recognize text
     const { data } = await worker.recognize(imageSrc);
     
     console.log("Recognition completed");
-    console.log("Recognized text:", data.text); // Log for debugging
+    console.log("Raw recognized text:", data.text);
+    console.log("Text length:", data.text.length);
+    console.log("Contains digits:", /\d/.test(data.text));
     
     // Terminate worker to free resources
     await worker.terminate();
     
     // Preprocess the recognized text
     const processedText = preprocessText(data.text);
-    console.log("Processed text:", processedText); // Log processed text for debugging
+    console.log("Processed text:", processedText);
+    
+    // Debug: look for card number patterns specifically
+    const cardPatterns = [
+      /5355\s*2800\s*1579\s*0706/i,
+      /5\d{3}\s*\d{4}\s*\d{4}\s*\d{4}/g,
+      /\d{4}\s*\d{4}\s*\d{4}\s*\d{4}/g
+    ];
+    
+    console.log("Checking for card patterns:");
+    cardPatterns.forEach((pattern, index) => {
+      const matches = data.text.match(pattern) || processedText.match(pattern);
+      console.log(`Pattern ${index + 1}:`, matches);
+    });
     
     // Це критично важлива додаткова перевірка для комбінації "8 380"
     if (data.text.match(/[8\s]+380\s?\d{2}\s?\d{3}\s?\d{4}/) || 
